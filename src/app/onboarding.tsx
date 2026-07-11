@@ -11,7 +11,7 @@ export default function OnboardingScreen() {
 
   const handleGuestEntry = () => {
     enterAsGuest();
-    router.replace('/(tabs)' as any);
+    router.replace('/settings' as any);
   };
 
   return (

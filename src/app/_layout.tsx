@@ -10,6 +10,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
 import { AuthProvider } from '../context/AuthContext';
 import { ProfileProvider } from '../context/ProfileContext';
 import { PropertyProvider } from '../context/PropertyContext';
@@ -46,12 +47,24 @@ export default function RootLayout() {
                 <Stack
                   screenOptions={{
                     headerShown: false,
-                    contentStyle: { backgroundColor: Theme.colors.background },
+                    contentStyle: {
+                      backgroundColor: Theme.colors.background,
+                    },
                   }}
                 >
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="onboarding" />
+                  <Stack.Screen name="login" />
+                  <Stack.Screen name="register" />
                   <Stack.Screen name="(tabs)" />
-                  <Stack.Screen name="owner/upload" options={{ presentation: 'modal' }} />
-                  <Stack.Screen name="settings" options={{ presentation: 'card' }} />
+                  <Stack.Screen
+                    name="owner/upload"
+                    options={{ presentation: 'modal' }}
+                  />
+                  <Stack.Screen
+                    name="settings"
+                    options={{ presentation: 'card' }}
+                  />
                 </Stack>
               </PropertyProvider>
             </ProfileProvider>

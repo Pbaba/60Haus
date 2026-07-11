@@ -4,41 +4,61 @@
 -- ==========================================
 
 -- 1. Create Normalized Property Videos Table
-create table public.property_videos (
-  id uuid default gen_random_uuid() primary key,
-  property_id uuid references public.properties(id) on delete cascade not null,
-  video_url text not null,
+CREATE TABLE IF NOT EXISTS public.property_videos (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  property_id uuid REFERENCES public.properties(id) ON DELETE CASCADE NOT NULL,
+  video_url text NOT NULL,
   thumbnail_url text,
   duration_seconds integer,
-  processing_status text default 'completed' check (processing_status in ('pending', 'processing', 'completed', 'failed')),
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+  processing_status text DEFAULT 'completed'
+    CHECK (processing_status IN ('pending', 'processing', 'completed', 'failed')),
+  created_at timestamp with time zone
+    DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 -- 2. Add Soft Delete and Analytics Columns to Properties
-alter table public.properties add column if not null deleted_at timestamp with time zone;
-alter table public.properties add column if not null view_count integer default 0;
-alter table public.properties add column if not null save_count integer default 0;
-alter table public.properties add column if not null contact_count integer default 0;
+ALTER TABLE public.properties
+ADD COLUMN IF NOT EXISTS deleted_at timestamp with time zone;
+
+ALTER TABLE public.properties
+ADD COLUMN IF NOT EXISTS view_count integer DEFAULT 0;
+
+ALTER TABLE public.properties
+ADD COLUMN IF NOT EXISTS save_count integer DEFAULT 0;
+
+ALTER TABLE public.properties
+ADD COLUMN IF NOT EXISTS contact_count integer DEFAULT 0;
 
 -- 3. Create Index on Property Videos
-create index idx_videos_property on public.property_videos(property_id);
+CREATE INDEX IF NOT EXISTS idx_videos_property
+ON public.property_videos(property_id);
 
 -- 4. Enable Row Level Security (RLS) on Videos
-alter table public.property_videos enable row level security;
+ALTER TABLE public.property_videos ENABLE ROW LEVEL SECURITY;
 
 -- 5. Setup Property Videos Table Security Policies
-create policy "Videos of published properties are viewable by everyone" on public.property_videos
-  for select using (
-    exists (
-      select 1 from public.properties 
-      where id = property_id and status = 'published' and deleted_at is null
-    )
-  );
 
-create policy "Owners can manage videos of their own listings" on public.property_videos
-  for all using (
-    exists (
-      select 1 from public.properties 
-      where id = property_id and owner_id = auth.uid()
-    )
-  );
+CREATE POLICY "Videos of published properties are viewable by everyone"
+ON public.property_videos
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.properties
+    WHERE id = property_id
+      AND status = 'published'
+      AND deleted_at IS NULL
+  )
+);
+
+CREATE POLICY "Owners can manage videos of their own listings"
+ON public.property_videos
+FOR ALL
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.properties
+    WHERE id = property_id
+      AND owner_id = auth.uid()
+  )
+);
