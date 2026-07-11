@@ -1,38 +1,53 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState, useEffect, useCallback } from 'react';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, FlatList } from 'react-native';
+import { useRouter, useNavigation } from 'expo-router';
 import { ScreenContainer } from '../../components/ScreenContainer';
 import { Avatar } from '../../components/Avatar';
 import { Card } from '../../components/Card';
-import { FeedbackState } from '../../components/FeedbackState';
+import { Skeleton } from '../../components/Skeleton';
 import { useAuth } from '../../hooks/useAuth';
 import { useProfile } from '../../hooks/useProfile';
 import { useProperties } from '../../hooks/useProperties';
 import { Theme } from '../../theme';
-import { ChevronRight, Settings, HelpCircle, Heart, PlusCircle, Building, User, Trash2 } from 'lucide-react-native';
+import { ChevronRight, Settings, HelpCircle, Heart, Building, User } from 'lucide-react-native';
 import { formatCurrency } from '../../utils';
 import { Image } from 'expo-image';
 import { Button } from '../../components/Button';
+import { historyService } from '../../services/historyService';
+import { PropertyListing } from '../../types';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { isGuest } = useAuth();
   const { profile, upgradeToOwner } = useProfile();
-  const { properties, savedIds, deleteListing } = useProperties();
+  const { properties, savedProperties } = useProperties();
   const isOwner = profile?.role === 'owner';
 
-  const [activeFilter, setActiveFilter] = useState<'all' | 'published' | 'draft'>('all');
+  const [recentViews, setRecentViews] = useState<PropertyListing[]>([]);
+  const [recentLoading, setRecentLoading] = useState(false);
 
-  // Filter listings published by this owner
-  const myListings = properties.filter((item) => item.ownerId === profile?.id);
-  const publishedListingsCount = myListings.filter(item => !item.status || item.status === 'published').length;
-  const draftListingsCount = myListings.filter(item => item.status === 'draft').length;
+  const fetchRecentHistory = useCallback(async () => {
+    if (isGuest || !profile?.id) return;
+    setRecentLoading(true);
+    try {
+      const history = await historyService.getRecentViews(profile.id);
+      setRecentViews(history);
+    } catch (e) {
+      console.warn('Failed to load recent views:', e);
+    } finally {
+      setRecentLoading(false);
+    }
+  }, [profile, isGuest]);
 
-  const displayedListings = myListings.filter((item) => {
-    if (activeFilter === 'published') return !item.status || item.status === 'published';
-    if (activeFilter === 'draft') return item.status === 'draft';
-    return true;
-  });
+  useEffect(() => {
+    fetchRecentHistory();
+
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchRecentHistory();
+    });
+    return unsubscribe;
+  }, [navigation, fetchRecentHistory]);
 
   const navigateToSettings = () => {
     router.push('/settings' as any);
@@ -41,68 +56,54 @@ export default function ProfileScreen() {
   const handleBecomeOwner = async () => {
     try {
       await upgradeToOwner();
-      alert('Congratulations! You are now listed as a Property Owner.');
+      Alert.alert('Success', 'Congratulations! You are now listed as a Property Owner.');
     } catch {
       // Errors handled inside context alert callbacks
     }
   };
 
-  const handleDelete = (id: string) => {
-    Alert.alert(
-      'Delete Listing',
-      'Are you sure you want to permanently delete this listing?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteListing(id);
-              Alert.alert('Success', 'Listing deleted.');
-            } catch {
-              Alert.alert('Error', 'Failed to delete listing.');
-            }
-          },
-        },
-      ]
-    );
-  };
 
-  const renderListingItem = (item: typeof properties[0]) => {
-    const isDraft = item.status === 'draft';
-    return (
-      <Card key={item.id} style={styles.listingItem}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          style={styles.listingItemContent}
-          onPress={() => router.push(`/owner/upload?id=${item.id}` as any)}
-        >
-          <Image
-            source={{ uri: item.thumbnailUrl }}
-            style={styles.listingThumb}
-            contentFit="cover"
-          />
-          <View style={styles.listingInfo}>
-            <Text style={styles.listingPrice}>{formatCurrency(item.price)}</Text>
-            <Text style={styles.listingTitle} numberOfLines={1}>
-              {item.title}
-            </Text>
-            <View style={styles.statusRow}>
-              <View style={[styles.statusBadge, isDraft ? styles.draftBadge : styles.publishedBadge]}>
-                <Text style={[styles.statusBadgeText, isDraft ? styles.draftBadgeText : styles.publishedBadgeText]}>
-                  {isDraft ? 'Draft' : 'Published'}
-                </Text>
-              </View>
+
+  const renderRecentItem = ({ item }: { item: PropertyListing }) => (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      style={styles.recentCard}
+      onPress={() => router.push(`/property/${item.id}` as any)}
+    >
+      <Image
+        source={{ uri: item.thumbnailUrl }}
+        style={styles.recentThumb}
+        contentFit="cover"
+      />
+      <View style={styles.recentInfo}>
+        <Text style={styles.recentPrice}>{formatCurrency(item.price)}</Text>
+        <Text style={styles.recentTitle} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <Text style={styles.recentLocation} numberOfLines={1}>
+          {item.city}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderRecentSkeletons = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionHeader}>Recently Viewed Properties</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+        {[1, 2, 3].map((key) => (
+          <View key={key} style={styles.recentCard}>
+            <Skeleton height={90} width="100%" />
+            <View style={styles.recentInfo}>
+              <Skeleton height={14} width="50%" />
+              <Skeleton height={12} width="80%" style={{ marginTop: 4 }} />
+              <Skeleton height={10} width="40%" style={{ marginTop: 4 }} />
             </View>
           </View>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.deleteListingBtn} onPress={() => handleDelete(item.id)}>
-          <Trash2 size={18} color={Theme.colors.danger} />
-        </TouchableOpacity>
-      </Card>
-    );
-  };
+        ))}
+      </ScrollView>
+    </View>
+  );
 
   // Guest Prompt View
   if (isGuest || !profile) {
@@ -150,12 +151,14 @@ export default function ProfileScreen() {
         {/* Stats Row */}
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
-            <Text style={styles.statNum}>{savedIds.length}</Text>
+            <Text style={styles.statNum}>{savedProperties.length}</Text>
             <Text style={styles.statLabel}>Saved Homes</Text>
           </View>
           {isOwner && (
             <View style={styles.statBox}>
-              <Text style={styles.statNum}>{myListings.length}</Text>
+              <Text style={styles.statNum}>
+                {properties.filter((p) => p.ownerId === profile?.id).length}
+              </Text>
               <Text style={styles.statLabel}>My Listings</Text>
             </View>
           )}
@@ -181,49 +184,36 @@ export default function ProfileScreen() {
         {/* Dynamic Section: My Listings List (Owner Only) */}
         {isOwner && (
           <View style={styles.section}>
-            <Text style={styles.sectionHeader}>My Listings Dashboard</Text>
-            <TouchableOpacity onPress={() => router.push('/owner/upload' as any)} activeOpacity={0.9} style={styles.ctaWrapper}>
+            <Text style={styles.sectionHeader}>Listings Management</Text>
+            <TouchableOpacity onPress={() => router.push('/owner/dashboard' as any)} activeOpacity={0.9} style={styles.ctaWrapper}>
               <Card style={styles.listingsCTA}>
-                <PlusCircle size={20} color={Theme.colors.primary} />
+                <Building size={20} color={Theme.colors.primary} />
                 <View style={styles.ctaTextContainer}>
-                  <Text style={styles.ctaTitle}>Add New Listing</Text>
-                  <Text style={styles.ctaSub}>Publish a vertical property tour.</Text>
+                  <Text style={styles.ctaTitle}>Go to Host Dashboard</Text>
+                  <Text style={styles.ctaSub}>Manage your listings, track analytics, and configure status.</Text>
                 </View>
                 <ChevronRight size={18} color={Theme.colors.textSecondary} />
               </Card>
             </TouchableOpacity>
-
-            {/* Dashboard Tabs Filters */}
-            <View style={styles.tabFilters}>
-              {(['all', 'published', 'draft'] as const).map((filter) => {
-                const isActive = activeFilter === filter;
-                let count = myListings.length;
-                if (filter === 'published') count = publishedListingsCount;
-                if (filter === 'draft') count = draftListingsCount;
-
-                return (
-                  <TouchableOpacity
-                    key={filter}
-                    style={[styles.tabFilterBtn, isActive && styles.tabFilterBtnActive]}
-                    onPress={() => setActiveFilter(filter)}
-                  >
-                    <Text style={[styles.tabFilterText, isActive && styles.tabFilterTextActive]}>
-                      {filter} ({count})
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            
-            {displayedListings.length > 0 ? (
-              <View style={styles.listingsContainer}>
-                {displayedListings.map(renderListingItem)}
-              </View>
-            ) : (
-              <FeedbackState type="empty-listings" />
-            )}
           </View>
         )}
+
+        {/* Recently Viewed History Section */}
+        {recentLoading ? (
+          renderRecentSkeletons()
+        ) : recentViews.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionHeader}>Recently Viewed Properties</Text>
+            <FlatList
+              horizontal
+              data={recentViews}
+              renderItem={renderRecentItem}
+              keyExtractor={(item) => `recent-${item.id}`}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalList}
+            />
+          </View>
+        ) : null}
 
         {/* Grouped Action Card */}
         <View style={styles.groupCard}>
@@ -398,7 +388,7 @@ const styles = StyleSheet.create({
     borderRadius: Theme.borderRadius.full,
     borderWidth: 1,
     borderColor: Theme.colors.border,
-    backgroundColor: Theme.colors.backgroundSecondary,
+    backgroundColor: Theme.colors.background,
   },
   tabFilterBtnActive: {
     borderColor: Theme.colors.primary,
@@ -450,6 +440,7 @@ const styles = StyleSheet.create({
   },
   listingTitle: {
     fontSize: Theme.typography.sizes.sm,
+    fontWeight: Theme.typography.weights.semiBold,
     color: Theme.colors.textPrimary,
     fontFamily: Theme.typography.fontFamily,
   },
@@ -458,14 +449,11 @@ const styles = StyleSheet.create({
   },
   statusBadge: {
     paddingVertical: 2,
-    paddingHorizontal: Theme.spacing.sm,
-    borderRadius: Theme.borderRadius.full,
-  },
-  statusBadgeText: {
-    fontFamily: Theme.typography.fontFamily,
+    paddingHorizontal: 8,
+    borderRadius: 4,
   },
   publishedBadge: {
-    backgroundColor: Theme.colors.success + '20',
+    backgroundColor: Theme.colors.success + '15',
   },
   publishedBadgeText: {
     color: Theme.colors.success,
@@ -473,7 +461,7 @@ const styles = StyleSheet.create({
     fontWeight: Theme.typography.weights.bold,
   },
   draftBadge: {
-    backgroundColor: Theme.colors.border,
+    backgroundColor: Theme.colors.textSecondary + '15',
   },
   draftBadgeText: {
     color: Theme.colors.textSecondary,
@@ -552,5 +540,44 @@ const styles = StyleSheet.create({
     fontSize: Theme.typography.sizes.sm,
     color: Theme.colors.primary,
     fontFamily: Theme.typography.fontFamily,
+  },
+  // Recently viewed styles
+  recentCard: {
+    width: 140,
+    backgroundColor: Theme.colors.surface,
+    borderRadius: Theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    overflow: 'hidden',
+    marginRight: Theme.spacing.md,
+  },
+  recentThumb: {
+    height: 90,
+    width: '100%',
+  },
+  recentInfo: {
+    padding: Theme.spacing.sm,
+    gap: 2,
+  },
+  recentPrice: {
+    fontSize: Theme.typography.sizes.sm,
+    fontWeight: Theme.typography.weights.bold,
+    color: Theme.colors.primary,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  recentTitle: {
+    fontSize: Theme.typography.sizes.xs,
+    fontWeight: Theme.typography.weights.semiBold,
+    color: Theme.colors.textPrimary,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  recentLocation: {
+    fontSize: 10,
+    color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  horizontalList: {
+    paddingLeft: Theme.spacing.md,
+    paddingBottom: Theme.spacing.md,
   },
 });

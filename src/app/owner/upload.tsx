@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { ScreenContainer } from '../../components/ScreenContainer';
@@ -16,33 +16,65 @@ import { propertyUploadService, VideoAsset } from '../../services/propertyUpload
 export default function OwnerUploadScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const { publishListing, updateListing, imageUploadProgress, videoUploadProgress, properties } = useProperties();
-  const { profile } = useProfile();
+  const { 
+    publishListing, 
+    updateListing, 
+    imageUploadProgress, 
+    videoUploadProgress, 
+    publishing, 
+    publishingStage,
+    properties 
+  } = useProperties();
+  const { profile, upgradeToOwner } = useProfile();
   const { isGuest } = useAuth();
   
+  // Route Protection Check
   useEffect(() => {
-    if (isGuest || !profile) {
+    if (isGuest) {
       Alert.alert(
         'Authentication Required',
         'Please register or sign in to upload property walkthroughs.',
-        [{ text: 'OK', onPress: () => router.replace('/onboarding' as any) }]
+        [
+          { text: 'Cancel', onPress: () => router.replace('/(tabs)' as any), style: 'cancel' },
+          { text: 'Sign In', onPress: () => router.replace('/login' as any) }
+        ]
+      );
+      return;
+    }
+
+    if (profile && profile.role !== 'owner') {
+      Alert.alert(
+        'Become a Property Owner',
+        'Only registered owners can publish property walkthroughs. Would you like to upgrade your account to owner status now?',
+        [
+          { text: 'Maybe Later', onPress: () => router.replace('/(tabs)/profile' as any), style: 'cancel' },
+          { 
+            text: 'Upgrade Now', 
+            onPress: async () => {
+              try {
+                await upgradeToOwner();
+                Alert.alert('Success', 'Your account has been upgraded! You can now publish listings.');
+              } catch {
+                router.replace('/(tabs)/profile' as any);
+              }
+            } 
+          }
+        ]
       );
     }
-  }, [isGuest, profile, router]);
+  }, [isGuest, profile, upgradeToOwner, router]);
   
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [bhk, setBhk] = useState('');
-  const [size, setSize] = useState('');
   const [furnishing, setFurnishing] = useState('fully-furnished');
   const [propertyType, setPropertyType] = useState('apartment');
   
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [videoAssetInfo, setVideoAssetInfo] = useState<VideoAsset | undefined>(undefined);
-  const [publishing, setPublishing] = useState(false);
 
   // Prefill when editing
   useEffect(() => {
@@ -62,6 +94,7 @@ export default function OwnerUploadScreen() {
   }, [id, properties]);
 
   const handlePickImages = async () => {
+    if (publishing) return;
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (permissionResult.granted === false) {
       Alert.alert('Permission Denied', 'Permission to access photo library is required.');
@@ -82,6 +115,7 @@ export default function OwnerUploadScreen() {
   };
 
   const handlePickVideo = async () => {
+    if (publishing) return;
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (permissionResult.granted === false) {
       Alert.alert('Permission Denied', 'Permission to access media library is required.');
@@ -115,16 +149,19 @@ export default function OwnerUploadScreen() {
   };
 
   const removeImage = (index: number) => {
+    if (publishing) return;
     setSelectedImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const removeVideo = () => {
+    if (publishing) return;
     setSelectedVideo(null);
     setVideoAssetInfo(undefined);
   };
 
   const handlePublish = async () => {
-    // 1. Minimum parameters validation checking
+    if (publishing) return; // Prevent duplicate submissions
+
     if (!title) {
       Alert.alert('Validation Error', 'Listing Title is required.');
       return;
@@ -146,12 +183,11 @@ export default function OwnerUploadScreen() {
       return;
     }
 
-    setPublishing(true);
     try {
       const listingData = {
-        ownerId: profile?.id || 'owner-456',
+        ownerId: profile!.id,
         title,
-        description: `Premium listing located at ${address}, offering custom facilities.`,
+        description: `Premium configuration located at ${address}, offering customized facilities.`,
         price: parseFloat(price),
         address,
         city,
@@ -163,6 +199,7 @@ export default function OwnerUploadScreen() {
         videoUrl: selectedVideo || '',
         thumbnailUrl: selectedImages[0],
         status: (id ? properties.find((p) => p.id === id)?.status : 'published') as any,
+        amenities: ['Reserved Parking', 'Water Supply', '24x7 Security'],
       };
 
       if (id) {
@@ -174,16 +211,15 @@ export default function OwnerUploadScreen() {
       }
       router.replace('/(tabs)' as any);
     } catch (e: any) {
-      Alert.alert('Error', e.message || `Failed to ${id ? 'update' : 'publish'} listing.`);
-    } finally {
-      setPublishing(false);
+      Alert.alert('Error', e.message || `Failed to ${id ? 'update' : 'publish'} listing. Please retry.`);
     }
   };
 
   return (
     <ScreenContainer style={styles.container} scrollable>
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} disabled={publishing}>
           <ArrowLeft size={24} color={Theme.colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.title}>{id ? 'Edit Listing' : 'New Listing'}</Text>
@@ -192,12 +228,14 @@ export default function OwnerUploadScreen() {
         </Text>
       </View>
 
+      {/* Main Form */}
       <View style={styles.form}>
         <View style={styles.mediaButtons}>
           <TouchableOpacity
             activeOpacity={Theme.motion.presets.press.scale}
             onPress={handlePickImages}
             style={[styles.mediaDropzone, { flex: 1 }]}
+            disabled={publishing}
           >
             <ImageIcon size={24} color={Theme.colors.primary} />
             <Text style={styles.dropzoneTitle}>Select Images</Text>
@@ -208,6 +246,7 @@ export default function OwnerUploadScreen() {
             activeOpacity={Theme.motion.presets.press.scale}
             onPress={handlePickVideo}
             style={[styles.mediaDropzone, { flex: 1 }]}
+            disabled={publishing}
           >
             <Video size={24} color={Theme.colors.primary} />
             <Text style={styles.dropzoneTitle}>Select Video</Text>
@@ -224,7 +263,7 @@ export default function OwnerUploadScreen() {
             {selectedImages.map((uri, index) => (
               <View key={index} style={styles.previewWrapper}>
                 <Image source={{ uri }} style={styles.previewImage} contentFit="cover" />
-                <TouchableOpacity style={styles.removeBtn} onPress={() => removeImage(index)}>
+                <TouchableOpacity style={styles.removeBtn} onPress={() => removeImage(index)} disabled={publishing}>
                   <X size={14} color="#FFF" />
                 </TouchableOpacity>
               </View>
@@ -238,28 +277,9 @@ export default function OwnerUploadScreen() {
             <Text style={styles.videoStatusText} numberOfLines={1}>
               Walkthrough Video Selected
             </Text>
-            <TouchableOpacity style={styles.removeVideoBtn} onPress={removeVideo}>
+            <TouchableOpacity style={styles.removeVideoBtn} onPress={removeVideo} disabled={publishing}>
               <X size={16} color={Theme.colors.textSecondary} />
             </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Media Upload Progress Bars */}
-        {publishing && imageUploadProgress > 0 && (
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: `${imageUploadProgress}%` }]} />
-            </View>
-            <Text style={styles.progressText}>Uploading images... {imageUploadProgress}%</Text>
-          </View>
-        )}
-
-        {publishing && videoUploadProgress > 0 && (
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: `${videoUploadProgress}%` }]} />
-            </View>
-            <Text style={styles.progressText}>Uploading video... {videoUploadProgress}%</Text>
           </View>
         )}
 
@@ -300,62 +320,84 @@ export default function OwnerUploadScreen() {
           onChangeText={setBhk}
           editable={!publishing}
         />
-        <Input
-          label="Property Size (sq ft)"
-          placeholder="e.g. 1450"
-          keyboardType="numeric"
-          value={size}
-          onChangeText={setSize}
-          editable={!publishing}
-        />
-
-        <Text style={styles.label}>Property Type</Text>
-        <View style={styles.chipContainer}>
-          {['apartment', 'villa', 'penthouse', 'row-house'].map((type) => {
-            const isActive = propertyType === type;
-            return (
-              <TouchableOpacity
-                key={type}
-                disabled={publishing}
-                style={[styles.chip, isActive && styles.activeChip]}
-                onPress={() => setPropertyType(type)}
-              >
-                <Text style={[styles.chipText, isActive && styles.activeChipText]}>
-                  {type.replace('-', ' ')}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+        
+        <View style={styles.pickerContainer}>
+          <Text style={styles.pickerLabel}>Furnishing Status</Text>
+          <View style={styles.pillRow}>
+            {['unfurnished', 'semi-furnished', 'fully-furnished'].map((f) => {
+              const active = furnishing === f;
+              return (
+                <TouchableOpacity
+                  key={f}
+                  style={[styles.pill, active && styles.pillActive]}
+                  onPress={() => setFurnishing(f)}
+                  disabled={publishing}
+                >
+                  <Text style={[styles.pillText, active && styles.pillTextActive]}>
+                    {f.replace('-', ' ')}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
-        <Text style={styles.label}>Furnishing Status</Text>
-        <View style={styles.chipContainer}>
-          {['unfurnished', 'semi-furnished', 'fully-furnished'].map((status) => {
-            const isActive = furnishing === status;
-            return (
-              <TouchableOpacity
-                key={status}
-                disabled={publishing}
-                style={[styles.chip, isActive && styles.activeChip]}
-                onPress={() => setFurnishing(status)}
-              >
-                <Text style={[styles.chipText, isActive && styles.activeChipText]}>
-                  {status.replace('-', ' ')}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+        <View style={styles.pickerContainer}>
+          <Text style={styles.pickerLabel}>Property Type</Text>
+          <View style={styles.pillRow}>
+            {['apartment', 'house', 'villa'].map((t) => {
+              const active = propertyType === t;
+              return (
+                <TouchableOpacity
+                  key={t}
+                  style={[styles.pill, active && styles.pillActive]}
+                  onPress={() => setPropertyType(t)}
+                  disabled={publishing}
+                >
+                  <Text style={[styles.pillText, active && styles.pillTextActive]}>
+                    {t}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
-        <Button
-          variant="primary"
-          style={styles.publishBtn}
-          onPress={handlePublish}
-          disabled={publishing}
-        >
-          {publishing ? 'Saving...' : (id ? 'Save Changes' : 'Publish Listing')}
+        <Button variant="primary" style={styles.publishBtn} onPress={handlePublish} disabled={publishing}>
+          {id ? 'Save Changes' : 'Publish Listing'}
         </Button>
       </View>
+
+      {/* Blocking Publishing Overlay */}
+      {publishing && (
+        <View style={styles.overlayContainer}>
+          <View style={styles.overlayCard}>
+            <ActivityIndicator size="large" color={Theme.colors.primary} />
+            <Text style={styles.overlayTitle}>{publishingStage}</Text>
+            <Text style={styles.overlaySub}>Please keep the app open during uploads.</Text>
+            
+            {imageUploadProgress > 0 && (
+              <View style={styles.progressRow}>
+                <Text style={styles.progressLabel}>Images:</Text>
+                <View style={styles.progressBarBg}>
+                  <View style={[styles.progressBarFill, { width: `${imageUploadProgress}%` }]} />
+                </View>
+                <Text style={styles.progressPct}>{imageUploadProgress}%</Text>
+              </View>
+            )}
+
+            {videoUploadProgress > 0 && (
+              <View style={styles.progressRow}>
+                <Text style={styles.progressLabel}>Video:</Text>
+                <View style={styles.progressBarBg}>
+                  <View style={[styles.progressBarFill, { width: `${videoUploadProgress}%` }]} />
+                </View>
+                <Text style={styles.progressPct}>{videoUploadProgress}%</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
     </ScreenContainer>
   );
 }
@@ -367,14 +409,11 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: Theme.spacing.xl,
-    paddingTop: Theme.spacing.lg,
+    paddingTop: Theme.spacing.xl,
     paddingBottom: Theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Theme.colors.border,
   },
   backBtn: {
-    marginBottom: Theme.spacing.sm,
-    marginLeft: -Theme.spacing.sm,
+    marginBottom: Theme.spacing.md,
   },
   title: {
     fontSize: Theme.typography.sizes.h1,
@@ -386,10 +425,10 @@ const styles = StyleSheet.create({
     fontSize: Theme.typography.sizes.sm,
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
-    marginTop: 2,
+    marginTop: Theme.spacing.xs,
   },
   form: {
-    padding: Theme.spacing.xl,
+    paddingHorizontal: Theme.spacing.xl,
     paddingBottom: Theme.spacing.xxxl,
     gap: Theme.spacing.md,
   },
@@ -398,32 +437,29 @@ const styles = StyleSheet.create({
     gap: Theme.spacing.md,
   },
   mediaDropzone: {
-    height: 100,
-    backgroundColor: Theme.colors.backgroundSecondary,
+    height: 120,
+    backgroundColor: Theme.colors.surface,
     borderRadius: Theme.borderRadius.lg,
     borderWidth: 1,
-    borderColor: Theme.colors.primary,
+    borderColor: Theme.colors.border,
     borderStyle: 'dashed',
-    alignItems: 'center',
     justifyContent: 'center',
-    padding: Theme.spacing.xs,
+    alignItems: 'center',
+    gap: Theme.spacing.xs,
   },
   dropzoneTitle: {
     fontSize: Theme.typography.sizes.sm,
     fontWeight: Theme.typography.weights.bold,
-    color: Theme.colors.primary,
+    color: Theme.colors.textPrimary,
     fontFamily: Theme.typography.fontFamily,
-    marginTop: 4,
   },
   dropzoneSub: {
     fontSize: 10,
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
-    textAlign: 'center',
-    marginTop: 2,
   },
   imagePreviewContainer: {
-    gap: Theme.spacing.md,
+    gap: Theme.spacing.sm,
     paddingVertical: Theme.spacing.xs,
   },
   previewWrapper: {
@@ -442,35 +478,121 @@ const styles = StyleSheet.create({
     top: 4,
     right: 4,
     backgroundColor: 'rgba(0,0,0,0.6)',
-    padding: 4,
-    borderRadius: 12,
+    borderRadius: 999,
+    padding: 2,
   },
   videoStatusCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Theme.spacing.sm,
     backgroundColor: Theme.colors.surface,
-    padding: Theme.spacing.md,
     borderRadius: Theme.borderRadius.md,
     borderWidth: 1,
     borderColor: Theme.colors.border,
+    padding: Theme.spacing.md,
+    gap: Theme.spacing.sm,
   },
   videoStatusText: {
-    flex: 1,
     fontSize: Theme.typography.sizes.sm,
     color: Theme.colors.textPrimary,
     fontFamily: Theme.typography.fontFamily,
+    flex: 1,
   },
   removeVideoBtn: {
-    padding: 4,
+    padding: 2,
   },
-  progressContainer: {
+  pickerContainer: {
     gap: Theme.spacing.xs,
-    paddingVertical: Theme.spacing.xs,
+  },
+  pickerLabel: {
+    fontSize: Theme.typography.sizes.sm,
+    fontWeight: Theme.typography.weights.semiBold,
+    color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  pillRow: {
+    flexDirection: 'row',
+    gap: Theme.spacing.sm,
+  },
+  pill: {
+    flex: 1,
+    paddingVertical: Theme.spacing.md,
+    backgroundColor: Theme.colors.surface,
+    borderColor: Theme.colors.border,
+    borderWidth: 1,
+    borderRadius: Theme.borderRadius.md,
+    alignItems: 'center',
+  },
+  pillActive: {
+    borderColor: Theme.colors.primary,
+    backgroundColor: Theme.colors.primary + '15',
+  },
+  pillText: {
+    fontSize: Theme.typography.sizes.xs,
+    color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamily,
+    textTransform: 'capitalize',
+  },
+  pillTextActive: {
+    color: Theme.colors.primary,
+    fontWeight: Theme.typography.weights.bold,
+  },
+  publishBtn: {
+    marginTop: Theme.spacing.lg,
+    width: '100%',
+  },
+  // Blocking overlay stylesheet
+  overlayContainer: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(10, 10, 11, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Theme.spacing.xxl,
+  },
+  overlayCard: {
+    width: '100%',
+    backgroundColor: Theme.colors.surface,
+    borderRadius: Theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    padding: Theme.spacing.xl,
+    alignItems: 'center',
+    gap: Theme.spacing.md,
+  },
+  overlayTitle: {
+    fontSize: Theme.typography.sizes.lg,
+    fontWeight: Theme.typography.weights.bold,
+    color: Theme.colors.textPrimary,
+    fontFamily: Theme.typography.fontFamily,
+    textAlign: 'center',
+    marginTop: Theme.spacing.sm,
+  },
+  overlaySub: {
+    fontSize: Theme.typography.sizes.xs,
+    color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamily,
+    textAlign: 'center',
+    marginBottom: Theme.spacing.md,
+  },
+  progressRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Theme.spacing.sm,
+  },
+  progressLabel: {
+    width: 60,
+    fontSize: Theme.typography.sizes.xs,
+    color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamily,
   },
   progressBarBg: {
+    flex: 1,
     height: 6,
-    backgroundColor: Theme.colors.border,
+    backgroundColor: Theme.colors.backgroundSecondary,
     borderRadius: Theme.borderRadius.full,
     overflow: 'hidden',
   },
@@ -478,48 +600,12 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: Theme.colors.primary,
   },
-  progressText: {
+  progressPct: {
+    width: 35,
     fontSize: Theme.typography.sizes.xs,
-    color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamily,
-    fontWeight: Theme.typography.weights.medium,
-  },
-  label: {
-    fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.medium,
-    color: Theme.colors.textSecondary,
-    marginBottom: -Theme.spacing.xs,
-    fontFamily: Theme.typography.fontFamily,
-  },
-  chipContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Theme.spacing.sm,
-  },
-  chip: {
-    paddingVertical: Theme.spacing.sm,
-    paddingHorizontal: Theme.spacing.lg,
-    borderRadius: Theme.borderRadius.full,
-    borderWidth: 1,
-    borderColor: Theme.colors.border,
-    backgroundColor: Theme.colors.backgroundSecondary,
-  },
-  activeChip: {
-    borderColor: Theme.colors.primary,
-    backgroundColor: Theme.colors.primary + '15',
-  },
-  chipText: {
-    fontSize: Theme.typography.sizes.sm,
-    color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
-    textTransform: 'capitalize',
-  },
-  activeChipText: {
-    color: Theme.colors.primary,
+    color: Theme.colors.textPrimary,
     fontWeight: Theme.typography.weights.bold,
-  },
-  publishBtn: {
-    marginTop: Theme.spacing.md,
-    width: '100%',
+    fontFamily: Theme.typography.fontFamily,
+    textAlign: 'right',
   },
 });

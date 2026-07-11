@@ -39,7 +39,7 @@ export default function RegisterScreen() {
 
   return (
     <ScreenContainer style={styles.container} scrollable>
-      <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+      <TouchableOpacity style={styles.backBtn} onPress={() => router.replace('/onboarding' as any)}>
         <ArrowLeft size={24} color={Theme.colors.textPrimary} />
       </TouchableOpacity>
 

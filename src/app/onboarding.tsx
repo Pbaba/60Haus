@@ -11,7 +11,7 @@ export default function OnboardingScreen() {
 
   const handleGuestEntry = () => {
     enterAsGuest();
-    router.replace('/settings' as any);
+    router.replace('/(tabs)' as any);
   };
 
   return (
@@ -34,10 +34,10 @@ export default function OnboardingScreen() {
               <Button style={styles.btn} variant="primary" onPress={handleGuestEntry}>
                 Explore as Guest
               </Button>
-              <Button style={styles.btn} variant="secondary" onPress={() => router.push('/login' as any)}>
+              <Button style={styles.btn} variant="secondary" onPress={() => router.replace('/login' as any)}>
                 Sign In
               </Button>
-              <TouchableOpacity onPress={() => router.push('/register' as any)} style={styles.registerLink}>
+              <TouchableOpacity onPress={() => router.replace('/register' as any)} style={styles.registerLink}>
                 <Text style={styles.registerText}>Don't have an account? Sign Up</Text>
               </TouchableOpacity>
             </View>

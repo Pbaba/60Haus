@@ -2,19 +2,16 @@ import { supabase } from '../lib/supabase';
 import { PropertyListing } from '../types';
 
 export const propertyService = {
-  async createListing(
-    listing: Omit<PropertyListing, 'id' | 'createdAt'>,
-    imageUrls: string[],
-    videoUrl?: string,
-    generatedThumbnailUrl?: string
-  ): Promise<PropertyListing> {
-    // 1. Insert Core Property listing
-    const { data: propData, error: propError } = await supabase
+  // Create listing placeholder record to generate ID from database
+  async createListingPlaceholder(
+    listing: Omit<PropertyListing, 'id' | 'createdAt'>
+  ): Promise<string> {
+    const { data, error } = await supabase
       .from('properties')
       .insert({
         owner_id: listing.ownerId,
         title: listing.title,
-        description: listing.description,
+        description: listing.description || '',
         price: listing.price,
         listing_type: listing.listingType,
         city: listing.city,
@@ -22,18 +19,39 @@ export const propertyService = {
         bedrooms: listing.bedrooms,
         bathrooms: listing.bathrooms,
         furnishing: listing.furnishing,
-        thumbnail_url: generatedThumbnailUrl || listing.thumbnailUrl,
+        thumbnail_url: 'placeholder', // Updated later with final upload path
         amenities: listing.amenities || [],
+        status: listing.status || 'published',
       })
-      .select()
+      .select('id')
       .single();
+
+    if (error) throw error;
+    if (!data) throw new Error('Failed to retrieve generated property ID.');
+    return data.id;
+  },
+
+  // Save final storage URLs to the database
+  async updateListingUrls(
+    propertyId: string,
+    imageUrls: string[],
+    videoUrl?: string,
+    thumbnailUrl?: string
+  ): Promise<void> {
+    // 1. Update parent record thumbnail URL
+    const { error: propError } = await supabase
+      .from('properties')
+      .update({
+        thumbnail_url: thumbnailUrl || imageUrls[0] || '',
+      })
+      .eq('id', propertyId);
 
     if (propError) throw propError;
 
-    // 2. Insert Normalized Gallery Images
+    // 2. Insert normalized gallery images
     if (imageUrls && imageUrls.length > 0) {
       const imgPayloads = imageUrls.map((url, index) => ({
-        property_id: propData.id,
+        property_id: propertyId,
         image_url: url,
         display_order: index,
       }));
@@ -45,37 +63,88 @@ export const propertyService = {
       if (imgError) throw imgError;
     }
 
-    // 3. Insert Normalized Listing Video
+    // 3. Insert walkthrough video
     if (videoUrl) {
       const { error: videoError } = await supabase
         .from('property_videos')
         .insert({
-          property_id: propData.id,
+          property_id: propertyId,
           video_url: videoUrl,
-          thumbnail_url: generatedThumbnailUrl || listing.thumbnailUrl,
+          thumbnail_url: thumbnailUrl || imageUrls[0] || '',
           processing_status: 'completed',
         });
 
       if (videoError) throw videoError;
     }
+  },
+
+  // Hard delete property
+  async deleteListingHard(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('properties')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+  },
+
+  // Retrieve Owner Dashboard metrics & listings
+  async getOwnerDashboardStats(ownerId: string): Promise<{
+    totalListings: number;
+    publishedListings: number;
+    archivedListings: number;
+    totalViews: number;
+    totalSaves: number;
+    totalContacts: number;
+    listings: PropertyListing[];
+  }> {
+    const listings = await this.getOwnerListings(ownerId);
+    
+    const published = listings.filter((l) => l.status === 'published' || !l.status);
+    const archived = listings.filter((l) => l.status === 'archived');
+    
+    const totalViews = listings.reduce((sum, l) => sum + (l.viewCount || 0), 0);
+    const totalSaves = listings.reduce((sum, l) => sum + (l.saveCount || 0), 0);
+    const totalContacts = listings.reduce((sum, l) => sum + (l.contactCount || 0), 0);
 
     return {
-      id: propData.id,
-      ownerId: propData.owner_id,
-      title: propData.title,
-      description: propData.description,
-      price: Number(propData.price),
-      listingType: propData.listing_type,
-      city: propData.city,
-      address: propData.address,
-      bedrooms: propData.bedrooms,
-      bathrooms: propData.bathrooms,
-      furnishing: propData.furnishing,
-      thumbnailUrl: generatedThumbnailUrl || propData.thumbnail_url,
+      totalListings: listings.length,
+      publishedListings: published.length,
+      archivedListings: archived.length,
+      totalViews,
+      totalSaves,
+      totalContacts,
+      listings,
+    };
+  },
+
+  // Publish listing directly
+  async createListing(
+    listing: Omit<PropertyListing, 'id' | 'createdAt'>,
+    imageUrls: string[],
+    videoUrl?: string,
+    generatedThumbnailUrl?: string
+  ): Promise<PropertyListing> {
+    const propertyId = await this.createListingPlaceholder(listing);
+    await this.updateListingUrls(propertyId, imageUrls, videoUrl, generatedThumbnailUrl);
+    
+    return {
+      id: propertyId,
+      ownerId: listing.ownerId,
+      title: listing.title,
+      description: listing.description,
+      price: Number(listing.price),
+      listingType: listing.listingType,
+      city: listing.city,
+      address: listing.address,
+      bedrooms: listing.bedrooms,
+      bathrooms: listing.bathrooms,
+      furnishing: listing.furnishing,
+      thumbnailUrl: generatedThumbnailUrl || imageUrls[0] || '',
       videoUrl: videoUrl || '',
-      createdAt: propData.created_at,
+      createdAt: new Date().toISOString(),
       imageUrls,
-      amenities: propData.amenities,
+      amenities: listing.amenities,
     };
   },
 
@@ -86,7 +155,7 @@ export const propertyService = {
     videoUrl?: string,
     generatedThumbnailUrl?: string
   ): Promise<PropertyListing> {
-    // 1. Update Core parameters
+    // 1. Update core details
     const { data: propData, error: propError } = await supabase
       .from('properties')
       .update({
@@ -177,7 +246,7 @@ export const propertyService = {
       .from('properties')
       .select('*, property_images(image_url), property_videos(video_url, thumbnail_url)')
       .eq('owner_id', ownerId)
-      .is('deleted_at', null) // Filter out soft deletes
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -204,15 +273,34 @@ export const propertyService = {
         imageUrls: item.property_images ? item.property_images.map((img: any) => img.image_url) : [],
         amenities: item.amenities,
         viewCount: item.view_count || 0,
+        saveCount: item.save_count || 0,
+        contactCount: item.contact_count || 0,
       };
     });
   },
 
   async deleteListing(id: string): Promise<void> {
-    // Soft delete: set deleted_at instead of hard delete
     const { error } = await supabase
       .from('properties')
       .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (error) throw error;
+  },
+
+  async archiveListing(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('properties')
+      .update({ status: 'archived' })
+      .eq('id', id);
+
+    if (error) throw error;
+  },
+
+  async restoreListing(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('properties')
+      .update({ status: 'published' })
       .eq('id', id);
 
     if (error) throw error;
@@ -233,6 +321,24 @@ export const propertyService = {
         .eq('id', id);
     } catch (e) {
       console.warn('Failed to increment view count:', e);
+    }
+  },
+
+  async incrementContactCount(id: string): Promise<void> {
+    try {
+      const { data: prop } = await supabase
+        .from('properties')
+        .select('contact_count')
+        .eq('id', id)
+        .single();
+
+      const current = prop?.contact_count || 0;
+      await supabase
+        .from('properties')
+        .update({ contact_count: current + 1 })
+        .eq('id', id);
+    } catch (e) {
+      console.warn('Failed to increment contact count:', e);
     }
   },
 };

@@ -39,8 +39,9 @@ export default function FeedScreen() {
   const { isGuest } = useAuth();
   const insets = useSafeAreaInsets();
   const {
+    properties,
     filteredProperties,
-    savedIds,
+    savedPropertyIds,
     toggleSave,
     loading,
     refreshing,
@@ -127,7 +128,7 @@ export default function FeedScreen() {
   });
 
   const renderItem = useCallback(({ item, index }: { item: PropertyListing; index: number }) => {
-    const isSaved = savedIds.includes(item.id);
+    const isSaved = savedPropertyIds.has(item.id);
     const isActive = index === activeIdx;
     
     return (
@@ -225,7 +226,7 @@ export default function FeedScreen() {
         </View>
       </View>
     );
-  }, [savedIds, activeIdx, isMuted, insets.bottom, handleReportPress, handleSavePress, incrementViewCount]);
+  }, [savedPropertyIds, activeIdx, isMuted, insets.bottom, handleReportPress, handleSavePress, incrementViewCount]);
 
   return (
     <ScreenContainer
@@ -259,7 +260,12 @@ export default function FeedScreen() {
           }
         />
       ) : (
-        <FeedbackState type="empty-search" />
+        <FeedbackState
+          type={properties.length === 0 ? 'empty-feed' : 'empty-search'}
+          title={properties.length === 0 ? 'No listings available yet.' : 'No Search Results'}
+          onRetry={properties.length === 0 ? handleRefresh : undefined}
+          actionText="Refresh Feed"
+        />
       )}
 
       {/* Property Details Bottom Sheet Overlay */}

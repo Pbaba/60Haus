@@ -5,10 +5,11 @@ import { Theme } from '../theme';
 import { Button } from './Button';
 
 export interface FeedbackStateProps {
-  type: 'loading' | 'empty-saved' | 'empty-search' | 'empty-listings' | 'error';
+  type: 'loading' | 'empty-saved' | 'empty-search' | 'empty-listings' | 'error' | 'empty-feed' | 'empty-history';
   onRetry?: () => void;
   title?: string;
   subtitle?: string;
+  actionText?: string;
 }
 
 export const FeedbackState: React.FC<FeedbackStateProps> = ({
@@ -16,8 +17,9 @@ export const FeedbackState: React.FC<FeedbackStateProps> = ({
   onRetry,
   title,
   subtitle,
+  actionText,
 }) => {
-  const renderContent = () => {
+  const renderVisualAndText = () => {
     switch (type) {
       case 'loading':
         return (
@@ -56,6 +58,26 @@ export const FeedbackState: React.FC<FeedbackStateProps> = ({
             </Text>
           </View>
         );
+      case 'empty-feed':
+        return (
+          <View style={styles.center}>
+            <FolderOpen size={48} color={Theme.colors.primary} />
+            <Text style={styles.title}>{title || 'No Listings Available'}</Text>
+            <Text style={styles.subtitle}>
+              {subtitle || 'No property listings are available in the marketplace yet.'}
+            </Text>
+          </View>
+        );
+      case 'empty-history':
+        return (
+          <View style={styles.center}>
+            <FolderOpen size={48} color={Theme.colors.primary} />
+            <Text style={styles.title}>{title || 'No Recently Viewed'}</Text>
+            <Text style={styles.subtitle}>
+              {subtitle || 'Explore listing walkthroughs on the Feed to track history.'}
+            </Text>
+          </View>
+        );
       case 'error':
         return (
           <View style={styles.center}>
@@ -64,17 +86,21 @@ export const FeedbackState: React.FC<FeedbackStateProps> = ({
             <Text style={styles.subtitle}>
               {subtitle || 'Failed to sync listing feed. Check connection and retry.'}
             </Text>
-            {onRetry && (
-              <Button variant="secondary" style={styles.retryBtn} onPress={onRetry}>
-                Retry Connection
-              </Button>
-            )}
           </View>
         );
     }
   };
 
-  return <View style={styles.container}>{renderContent()}</View>;
+  return (
+    <View style={styles.container}>
+      {renderVisualAndText()}
+      {onRetry && type !== 'loading' && (
+        <Button variant="primary" style={styles.actionBtn} onPress={onRetry}>
+          {actionText || 'Retry'}
+        </Button>
+      )}
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
@@ -84,6 +110,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: Theme.spacing.xxl,
     backgroundColor: 'transparent',
+    gap: Theme.spacing.lg,
   },
   center: {
     alignItems: 'center',
@@ -106,7 +133,8 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     paddingHorizontal: Theme.spacing.lg,
   },
-  retryBtn: {
-    marginTop: Theme.spacing.lg,
+  actionBtn: {
+    marginTop: Theme.spacing.md,
+    minWidth: 160,
   },
 });

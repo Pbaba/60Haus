@@ -1,7 +1,9 @@
 import { supabase } from '../lib/supabase';
+import * as Linking from 'expo-linking';
 
 export const authService = {
   async signUp(email: string, password: string, fullName: string) {
+    const redirectUrl = Linking.createURL('/auth/callback');
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -9,6 +11,7 @@ export const authService = {
         data: {
           full_name: fullName,
         },
+        emailRedirectTo: redirectUrl,
       },
     });
     if (error) throw error;

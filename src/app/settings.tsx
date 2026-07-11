@@ -10,6 +10,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../hooks/useProfile';
 import { Theme } from '../theme';
 import { ArrowLeft, Bell, Shield, LogOut, Camera } from 'lucide-react-native';
+import { propertyUploadService } from '../services/propertyUploadService';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -20,6 +21,12 @@ export default function SettingsScreen() {
   const [bio, setBio] = useState(profile?.bio || '');
   const [phone, setPhone] = useState(profile?.phoneNumber || '');
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatarUrl || '');
+  
+  // Preference States
+  const [preferredCity, setPreferredCity] = useState(profile?.preferredCity || '');
+  const [preferredListingType, setPreferredListingType] = useState<'rent' | 'buy' | null>(profile?.preferredListingType || null);
+  const [preferredBudget, setPreferredBudget] = useState(profile?.preferredBudget ? String(profile.preferredBudget) : '');
+  const [saveLoading, setSaveLoading] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -44,16 +51,31 @@ export default function SettingsScreen() {
   };
 
   const handleSaveChanges = async () => {
+    if (!profile) return;
+    setSaveLoading(true);
     try {
+      let finalAvatarUrl = avatarUrl;
+      if (avatarUrl && avatarUrl.startsWith('file://')) {
+        finalAvatarUrl = await propertyUploadService.uploadAvatar(profile.id, avatarUrl);
+        setAvatarUrl(finalAvatarUrl);
+      }
+
+      const budgetNum = preferredBudget ? parseInt(preferredBudget, 10) : undefined;
       await updateProfile({
         fullName: name,
         bio,
         phoneNumber: phone,
-        avatarUrl,
+        avatarUrl: finalAvatarUrl,
+        preferredCity,
+        preferredListingType: preferredListingType || undefined,
+        preferredBudget: budgetNum,
       });
-      Alert.alert('Success', 'Profile updated successfully.');
-    } catch {
-      // Errors handled inside profile context
+      Alert.alert('Success', 'Profile and preferences updated successfully.');
+    } catch (e) {
+      console.error('Failed to update profile changes:', e);
+      Alert.alert('Error', 'Failed to save changes. Please try again.');
+    } finally {
+      setSaveLoading(false);
     }
   };
 
@@ -79,6 +101,7 @@ export default function SettingsScreen() {
             </View>
 
             <View style={styles.form}>
+              <Text style={styles.sectionTitle}>General Information</Text>
               <Input
                 label="Full Name"
                 placeholder="e.g. Alex Mercer"
@@ -97,9 +120,44 @@ export default function SettingsScreen() {
                 value={bio}
                 onChangeText={setBio}
               />
+
+              {/* Personalization Section */}
+              <Text style={styles.sectionTitle}>Discovery Preferences</Text>
+              <Input
+                label="Preferred City"
+                placeholder="e.g. Mumbai, Delhi, Bangalore"
+                value={preferredCity}
+                onChangeText={setPreferredCity}
+              />
               
-              <Button variant="primary" style={styles.saveBtn} onPress={handleSaveChanges}>
-                Save Profile Changes
+              <View style={styles.pickerContainer}>
+                <Text style={styles.pickerLabel}>Preferred Listing Type</Text>
+                <View style={styles.pillRow}>
+                  <TouchableOpacity
+                    style={[styles.pill, preferredListingType === 'rent' && styles.pillActive]}
+                    onPress={() => setPreferredListingType('rent')}
+                  >
+                    <Text style={[styles.pillText, preferredListingType === 'rent' && styles.pillTextActive]}>Rent</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.pill, preferredListingType === 'buy' && styles.pillActive]}
+                    onPress={() => setPreferredListingType('buy')}
+                  >
+                    <Text style={[styles.pillText, preferredListingType === 'buy' && styles.pillTextActive]}>Buy</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <Input
+                label="Preferred Max Budget (INR)"
+                placeholder="e.g. 50000"
+                keyboardType="numeric"
+                value={preferredBudget}
+                onChangeText={setPreferredBudget}
+              />
+              
+              <Button variant="primary" style={styles.saveBtn} loading={saveLoading} onPress={handleSaveChanges}>
+                Save Changes
               </Button>
             </View>
           </View>
@@ -151,14 +209,11 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: Theme.spacing.xl,
-    paddingTop: Theme.spacing.lg,
+    paddingTop: Theme.spacing.xl,
     paddingBottom: Theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Theme.colors.border,
   },
   backBtn: {
-    marginBottom: Theme.spacing.sm,
-    marginLeft: -Theme.spacing.sm,
+    marginBottom: Theme.spacing.md,
   },
   title: {
     fontSize: Theme.typography.sizes.h1,
@@ -170,31 +225,32 @@ const styles = StyleSheet.create({
     fontSize: Theme.typography.sizes.sm,
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
-    marginTop: 2,
+    marginTop: Theme.spacing.xs,
   },
   content: {
-    padding: Theme.spacing.xl,
-    gap: Theme.spacing.xxl,
+    paddingHorizontal: Theme.spacing.xl,
+    paddingBottom: Theme.spacing.xxl,
+    gap: Theme.spacing.xl,
   },
   profileEditSection: {
-    alignItems: 'center',
     gap: Theme.spacing.lg,
   },
   avatarContainer: {
+    alignItems: 'center',
     position: 'relative',
+    alignSelf: 'center',
   },
   cameraIcon: {
     position: 'absolute',
     bottom: 0,
     right: 0,
     backgroundColor: Theme.colors.primary,
-    padding: 6,
-    borderRadius: 16,
+    padding: Theme.spacing.xs,
+    borderRadius: Theme.borderRadius.full,
     borderWidth: 2,
-    borderColor: Theme.colors.background,
+    borderColor: Theme.colors.surface,
   },
   form: {
-    width: '100%',
     gap: Theme.spacing.md,
   },
   saveBtn: {
@@ -257,5 +313,52 @@ const styles = StyleSheet.create({
   },
   logoutIcon: {
     marginRight: Theme.spacing.sm,
+  },
+  // Personalization settings styles
+  sectionTitle: {
+    fontSize: Theme.typography.sizes.md,
+    fontWeight: Theme.typography.weights.bold,
+    color: Theme.colors.textSecondary,
+    marginTop: Theme.spacing.md,
+    marginBottom: Theme.spacing.xs,
+    fontFamily: Theme.typography.fontFamily,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  pickerContainer: {
+    marginBottom: Theme.spacing.md,
+  },
+  pickerLabel: {
+    fontSize: Theme.typography.sizes.sm,
+    fontWeight: Theme.typography.weights.semiBold,
+    color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamily,
+    marginBottom: Theme.spacing.xs,
+  },
+  pillRow: {
+    flexDirection: 'row',
+    gap: Theme.spacing.sm,
+  },
+  pill: {
+    flex: 1,
+    paddingVertical: Theme.spacing.md,
+    backgroundColor: Theme.colors.background,
+    borderColor: Theme.colors.border,
+    borderWidth: 1,
+    borderRadius: Theme.borderRadius.md,
+    alignItems: 'center',
+  },
+  pillActive: {
+    borderColor: Theme.colors.primary,
+    backgroundColor: Theme.colors.primary + '15',
+  },
+  pillText: {
+    fontSize: Theme.typography.sizes.md,
+    color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  pillTextActive: {
+    color: Theme.colors.primary,
+    fontWeight: Theme.typography.weights.bold,
   },
 });

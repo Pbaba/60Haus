@@ -55,8 +55,19 @@ export const Button: React.FC<ButtonProps> = ({
           color={variant === 'primary' ? Theme.colors.textOnPrimary : Theme.colors.primary}
           size="small"
         />
-      ) : typeof children === 'string' ? (
+      ) : typeof children === 'string' || typeof children === 'number' ? (
         <Text style={textStyles}>{children}</Text>
+      ) : Array.isArray(children) ? (
+        children.map((child, index) => {
+          if (typeof child === 'string' || typeof child === 'number') {
+            return (
+              <Text key={`btn-txt-${index}`} style={textStyles}>
+                {child}
+              </Text>
+            );
+          }
+          return child;
+        })
       ) : (
         children
       )}

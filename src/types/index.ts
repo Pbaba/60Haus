@@ -7,6 +7,9 @@ export interface UserProfile {
   phoneNumber?: string;
   role: 'hunter' | 'owner';
   createdAt: string;
+  preferredCity?: string;
+  preferredListingType?: 'rent' | 'buy';
+  preferredBudget?: number;
 }
 
 export interface PropertyListing {
@@ -30,6 +33,8 @@ export interface PropertyListing {
   latitude?: number;
   longitude?: number;
   viewCount?: number;
+  saveCount?: number;
+  contactCount?: number;
   deletedAt?: string;
 }
 

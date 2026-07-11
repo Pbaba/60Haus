@@ -2,20 +2,40 @@ import { PropertyListing } from '../types';
 import { SearchFilters } from '../components/SearchOverlay';
 import { propertySearchService } from './propertySearchService';
 import { supabase } from '../lib/supabase';
+import { bookmarkService } from './bookmarkService';
+import { historyService } from './historyService';
+
+const PERSONALIZATION_WEIGHTS = {
+  city: 0.3,
+  listingType: 0.2,
+  budget: 0.1,
+  savedSimilarity: 0.15,
+  recentHistory: 0.1,
+};
 
 export const discoveryService = {
-  // Simple weighted score combining Freshness and Sponsored boost
-  rankListings(listings: PropertyListing[]): PropertyListing[] {
+  rankListings(
+    listings: PropertyListing[],
+    userPref?: any,
+    savedProperties?: PropertyListing[],
+    recentlyViewedProperties?: PropertyListing[]
+  ): PropertyListing[] {
     const now = new Date().getTime();
     
     return [...listings].sort((a, b) => {
-      const scoreA = this.computeListingScore(a, now);
-      const scoreB = this.computeListingScore(b, now);
+      const scoreA = this.computeListingScore(a, now, userPref, savedProperties, recentlyViewedProperties);
+      const scoreB = this.computeListingScore(b, now, userPref, savedProperties, recentlyViewedProperties);
       return scoreB - scoreA;
     });
   },
 
-  computeListingScore(item: PropertyListing, nowTimestamp: number): number {
+  computeListingScore(
+    item: PropertyListing,
+    nowTimestamp: number,
+    userPref?: any,
+    savedProperties?: PropertyListing[],
+    recentlyViewedProperties?: PropertyListing[]
+  ): number {
     // 1. Freshness Score: 1 / (1 + age_in_days)
     const ageInMs = nowTimestamp - new Date(item.createdAt).getTime();
     const ageInDays = Math.max(0, ageInMs / (1000 * 60 * 60 * 24));
@@ -25,21 +45,86 @@ export const discoveryService = {
     let sponsoredBoost = 0;
     const raw = item as any;
     if (raw.is_sponsored || raw.isSponsored) {
-      // Add boost of 1.0 + priority_score
       sponsoredBoost = 1.0 + (raw.priorityScore || raw.priority_score || 0.0);
     }
 
-    return freshness + sponsoredBoost;
+    let personalizationScore = 0;
+
+    // 3. Explicit Profile Preferences
+    if (userPref) {
+      if (userPref.preferredCity && item.city.toLowerCase() === userPref.preferredCity.toLowerCase()) {
+        personalizationScore += PERSONALIZATION_WEIGHTS.city;
+      }
+      if (userPref.preferredListingType && item.listingType === userPref.preferredListingType) {
+        personalizationScore += PERSONALIZATION_WEIGHTS.listingType;
+      }
+      if (userPref.preferredBudget && item.price <= userPref.preferredBudget) {
+        personalizationScore += PERSONALIZATION_WEIGHTS.budget;
+      }
+    }
+
+    // 4. Saved Home Similarity Signals
+    if (savedProperties && savedProperties.length > 0) {
+      const hasSimilarSaved = savedProperties.some(
+        (p) =>
+          p.city.toLowerCase() === item.city.toLowerCase() &&
+          p.bedrooms === item.bedrooms &&
+          p.listingType === item.listingType
+      );
+      if (hasSimilarSaved) {
+        personalizationScore += PERSONALIZATION_WEIGHTS.savedSimilarity;
+      }
+    }
+
+    // 5. Recently Viewed Similarity Signals
+    if (recentlyViewedProperties && recentlyViewedProperties.length > 0) {
+      const hasSimilarViewed = recentlyViewedProperties.some(
+        (p) =>
+          p.city.toLowerCase() === item.city.toLowerCase() &&
+          p.bedrooms === item.bedrooms &&
+          p.listingType === item.listingType
+      );
+      if (hasSimilarViewed) {
+        personalizationScore += PERSONALIZATION_WEIGHTS.recentHistory;
+      }
+    }
+
+    return freshness + sponsoredBoost + personalizationScore;
   },
 
   // Centralized Feed loader (retrieves raw list, computes scores and ranks them)
   async getRankedFeed(
+    userId?: string,
     cursor?: string,
     limit: number = 10,
     filters?: SearchFilters
   ): Promise<PropertyListing[]> {
     const rawItems = await propertySearchService.getFeedListings(cursor, limit, filters);
-    return this.rankListings(rawItems);
+    
+    if (!userId) {
+      return this.rankListings(rawItems);
+    }
+
+    try {
+      // Load implicit and explicit ranking signals concurrently to optimize speed
+      const [profileRes, saved, recent] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', userId).single(),
+        bookmarkService.getSavedProperties(userId).catch(() => []),
+        historyService.getRecentViews(userId).catch(() => []),
+      ]);
+
+      const profile = profileRes.data;
+      const userPref = profile ? {
+        preferredCity: profile.preferred_city,
+        preferredListingType: profile.preferred_listing_type,
+        preferredBudget: profile.preferred_budget,
+      } : undefined;
+
+      return this.rankListings(rawItems, userPref, saved, recent);
+    } catch (e) {
+      console.warn('Personalized ranking inputs load failed, using fallback default ranks:', e);
+      return this.rankListings(rawItems);
+    }
   },
 
   // Recommendations: matches similar listings based on city, locality, type, bedrooms

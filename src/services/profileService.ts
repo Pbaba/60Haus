@@ -21,6 +21,9 @@ export const profileService = {
       phoneNumber: data.phone_number || '',
       role: data.role as 'hunter' | 'owner',
       createdAt: data.created_at,
+      preferredCity: data.preferred_city || undefined,
+      preferredListingType: data.preferred_listing_type || undefined,
+      preferredBudget: data.preferred_budget ? Number(data.preferred_budget) : undefined,
     };
   },
 
@@ -30,6 +33,9 @@ export const profileService = {
     if (updates.avatarUrl !== undefined) payload.avatar_url = updates.avatarUrl;
     if (updates.bio !== undefined) payload.bio = updates.bio;
     if (updates.phoneNumber !== undefined) payload.phone_number = updates.phoneNumber;
+    if (updates.preferredCity !== undefined) payload.preferred_city = updates.preferredCity;
+    if (updates.preferredListingType !== undefined) payload.preferred_listing_type = updates.preferredListingType;
+    if (updates.preferredBudget !== undefined) payload.preferred_budget = updates.preferredBudget;
 
     const { error } = await supabase
       .from('profiles')
