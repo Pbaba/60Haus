@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -8,16 +8,22 @@ import {
   RefreshControl,
   ScrollView,
   Alert,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
 import { useAuth } from '../../hooks/useAuth';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Bookmark, Phone, MapPin, Flag } from 'lucide-react-native';
+import { Bookmark, Phone, MapPin, Flag, Search } from 'lucide-react-native';
+import { useFeedback } from '../../context/FeedbackContext';
+import { profileService } from '../../services/profileService';
 import Animated from 'react-native-reanimated';
 import { ScreenContainer } from '../../components/ScreenContainer';
 import { Button } from '../../components/Button';
+import { DiscoveryEndScreen } from '../../components/DiscoveryEndScreen';
+import { SkeletonFeed } from '../../components/Skeleton';
+import { ImageFeedItem } from '../../components/ImageFeedItem';
 import { Input } from '../../components/Input';
 import { Avatar } from '../../components/Avatar';
 import { BottomSheet } from '../../components/BottomSheet';
@@ -48,7 +54,24 @@ export default function FeedScreen() {
     fetchFeed,
     loadMoreFeed,
     incrementViewCount,
+    discoveryMode,
+    hasExactMatchesRemaining,
+    incrementContactCount,
+    filters,
   } = useProperties();
+  const { showToast, showTransactionFeedback } = useFeedback();
+
+  const listRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (listRef.current) {
+      try {
+        listRef.current.scrollToOffset({ offset: 0, animated: false });
+      } catch {
+        // Safe fail
+      }
+    }
+  }, [properties.length, discoveryMode]);
   
   const [selectedProperty, setSelectedProperty] = useState<PropertyListing | null>(null);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -95,7 +118,8 @@ export default function FeedScreen() {
     setSubmittingReport(true);
     try {
       await reportService.submitReport(reportingPropertyId, reportReason, reportDetails);
-      Alert.alert(
+      showTransactionFeedback(
+        'success',
         'Report Submitted',
         'Thank you. Our moderation team will review this listing shortly.'
       );
@@ -103,7 +127,7 @@ export default function FeedScreen() {
       setReportReason(null);
       setReportDetails('');
     } catch {
-      Alert.alert('Error', 'Failed to submit report. Please try again.');
+      showTransactionFeedback('error', 'Report Failed', 'Failed to submit report. Please try again.');
     } finally {
       setSubmittingReport(false);
     }
@@ -117,6 +141,20 @@ export default function FeedScreen() {
     setSelectedProperty(property);
   };
 
+  const handleQuickCall = useCallback(async (item: PropertyListing) => {
+    try {
+      await incrementContactCount(item.id);
+      const owner = await profileService.getProfile(item.ownerId);
+      if (owner?.phoneNumber) {
+        Linking.openURL(`tel:${owner.phoneNumber}`);
+      } else {
+        showToast('No contact phone number provided by the homeowner.', 'warning');
+      }
+    } catch {
+      showToast('Failed to retrieve owner details. Please try again.', 'error');
+    }
+  }, [incrementContactCount, showToast]);
+
   const [viewabilityConfig] = useState(() => ({
     itemVisiblePercentThreshold: 80,
   }));
@@ -127,20 +165,63 @@ export default function FeedScreen() {
     }
   });
 
+  // Prefetch upcoming images when activeIdx changes
+  useEffect(() => {
+    const nextIdx1 = activeIdx + 1;
+    const nextIdx2 = activeIdx + 2;
+    const prefetches: string[] = [];
+
+    [nextIdx1, nextIdx2].forEach((idx) => {
+      if (idx < filteredProperties.length) {
+        const item = filteredProperties[idx];
+        if (item.thumbnailUrl) prefetches.push(item.thumbnailUrl);
+        if (item.imageUrls && item.imageUrls.length > 0) {
+          prefetches.push(item.imageUrls[0]);
+        }
+      }
+    });
+
+    if (prefetches.length > 0) {
+      Image.prefetch(prefetches);
+    }
+  }, [activeIdx, filteredProperties]);
+
   const renderItem = useCallback(({ item, index }: { item: PropertyListing; index: number }) => {
-    const isSaved = savedPropertyIds.has(item.id);
     const isActive = index === activeIdx;
+
+    if ((item as any).isEndCard) {
+      return (
+        <View style={styles.page}>
+          <DiscoveryEndScreen
+            isActive={isActive}
+            onOpenFilters={() => router.replace('/(tabs)/search' as any)}
+          />
+        </View>
+      );
+    }
+
+    const isSaved = savedPropertyIds.has(item.id);
     
     return (
       <View style={styles.page}>
-        <VideoFeedItem
-          videoUrl={item.videoUrl || 'https://player.vimeo.com/external/371433846.sd.mp4?s=236da2f3c054f4d823e1e6955a5b512dbf2d9dbd&profile_id=139&oauth2_token_id=57447761'}
-          thumbnailUrl={item.thumbnailUrl}
-          isActive={isActive}
-          isMuted={isMuted}
-          onToggleMute={() => setIsMuted(prev => !prev)}
-          onViewCountIncrement={() => incrementViewCount(item.id)}
-        />
+        {item.videoUrl ? (
+          <VideoFeedItem
+            videoUrl={item.videoUrl}
+            thumbnailUrl={item.thumbnailUrl}
+            isActive={isActive}
+            isMuted={isMuted}
+            onToggleMute={() => setIsMuted(prev => !prev)}
+            onViewCountIncrement={() => incrementViewCount(item.id)}
+            onDoubleTapSave={() => handleSavePress(item.id)}
+            shouldLoad={isActive || index === activeIdx + 1}
+          />
+        ) : (
+          <ImageFeedItem
+            imageUrls={item.imageUrls || []}
+            thumbnailUrl={item.thumbnailUrl}
+            onDoubleTapSave={() => handleSavePress(item.id)}
+          />
+        )}
         
         <View style={styles.gradientOverlay} />
 
@@ -186,7 +267,7 @@ export default function FeedScreen() {
             <Button
               variant="primary"
               style={styles.contactBtn}
-              onPress={() => alert(`Contacting Owner: ${item.title}`)}
+              onPress={() => handleQuickCall(item)}
             >
               Contact Owner
             </Button>
@@ -209,7 +290,7 @@ export default function FeedScreen() {
             <TouchableOpacity
               activeOpacity={0.8}
               style={styles.sidebarBtn}
-              onPress={() => alert(`Calling Owner at +91 99999 88888`)}
+              onPress={() => handleQuickCall(item)}
             >
               <Phone size={20} color={Theme.colors.textPrimary} />
             </TouchableOpacity>
@@ -226,7 +307,15 @@ export default function FeedScreen() {
         </View>
       </View>
     );
-  }, [savedPropertyIds, activeIdx, isMuted, insets.bottom, handleReportPress, handleSavePress, incrementViewCount]);
+  }, [savedPropertyIds, activeIdx, isMuted, insets.bottom, handleReportPress, handleSavePress, handleQuickCall, incrementViewCount, router]);
+
+  const listData = [...filteredProperties];
+  if (!hasExactMatchesRemaining && listData.length > 0 && !loading) {
+    listData.push({
+      id: 'discovery-end-card',
+      isEndCard: true,
+    } as any);
+  }
 
   return (
     <ScreenContainer
@@ -234,11 +323,57 @@ export default function FeedScreen() {
       safeAreaBottom={false}
       style={styles.container}
     >
+      {/* Floating Filters Header */}
+      {!loading && listData.length > 0 && (
+        <View style={styles.floatingHeader}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipsScroll}
+          >
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.searchButton}
+              onPress={() => router.push('/search' as any)}
+            >
+              <Search size={18} color="#FFF" />
+            </TouchableOpacity>
+
+            <View style={styles.chip}>
+              <Text style={styles.chipText}>{filters.city}</Text>
+            </View>
+
+            <View style={styles.chip}>
+              <Text style={styles.chipText}>For {filters.listingType === 'rent' ? 'Rent' : 'Buy'}</Text>
+            </View>
+
+            {filters.bhk && (
+              <View style={styles.chip}>
+                <Text style={styles.chipText}>{filters.bhk} BHK</Text>
+              </View>
+            )}
+
+            {filters.furnishing && (
+              <View style={styles.chip}>
+                <Text style={styles.chipText}>{filters.furnishing.replace('-', ' ')}</Text>
+              </View>
+            )}
+
+            {filters.petFriendly && (
+              <View style={styles.chip}>
+                <Text style={styles.chipText}>Pet Friendly 🐾</Text>
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      )}
+
       {loading ? (
-        <FeedbackState type="loading" />
-      ) : filteredProperties.length > 0 ? (
+        <SkeletonFeed />
+      ) : listData.length > 0 ? (
         <FlashListAny
-          data={filteredProperties}
+          ref={listRef}
+          data={listData}
           renderItem={renderItem}
           keyExtractor={(item: PropertyListing) => item.id}
           pagingEnabled
@@ -715,5 +850,44 @@ const styles = StyleSheet.create({
   submitReportBtn: {
     width: '100%',
     marginTop: Theme.spacing.xs,
+  },
+  floatingHeader: {
+    position: 'absolute',
+    top: 54,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    paddingHorizontal: Theme.spacing.lg,
+  },
+  chipsScroll: {
+    alignItems: 'center',
+    gap: Theme.spacing.xs,
+    paddingRight: 30,
+  },
+  searchButton: {
+    backgroundColor: 'rgba(21, 21, 24, 0.85)',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  chip: {
+    backgroundColor: 'rgba(21, 21, 24, 0.85)',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+  },
+  chipText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+    fontFamily: Theme.typography.fontFamily,
   },
 });

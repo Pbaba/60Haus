@@ -1,8 +1,7 @@
-import React, { createContext, useState, useEffect, useCallback } from 'react';
-import * as Haptics from 'expo-haptics';
-import { Alert } from 'react-native';
+import React, { createContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { hapticsService } from '../services/hapticsService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PropertyListing } from '../types';
+import { PropertyListing, DiscoveryMode } from '../types';
 import { SearchFilters } from '../components/SearchOverlay';
 import { propertyService } from '../services/propertyService';
 import { discoveryService } from '../services/discoveryService';
@@ -10,6 +9,7 @@ import { propertyUploadService, VideoAsset } from '../services/propertyUploadSer
 import { bookmarkService } from '../services/bookmarkService';
 import { historyService } from '../services/historyService';
 import { useAuth } from '../hooks/useAuth';
+import { useFeedback } from './FeedbackContext';
 
 interface PropertyContextType {
   properties: PropertyListing[];
@@ -45,24 +45,51 @@ interface PropertyContextType {
   videoUploadProgress: number;
   publishing: boolean;
   publishingStage: string;
+  discoveryMode: DiscoveryMode;
+  setDiscoveryMode: (mode: DiscoveryMode) => void;
+  hasExactMatchesRemaining: boolean;
+  flexibleLevel: number;
+  setFlexibleLevel: React.Dispatch<React.SetStateAction<number>>;
 }
+
+interface FeedCacheEntry {
+  items: PropertyListing[];
+  hasMore: boolean;
+  timestamp: number;
+}
+let feedCache: Record<string, FeedCacheEntry> = {};
+
+const getFeedCacheKey = (
+  userId: string | undefined,
+  filters: SearchFilters,
+  mode: DiscoveryMode,
+  level: number,
+  localities: string[]
+) => {
+  return `${userId || 'guest'}_${JSON.stringify(filters)}_${mode}_${level}_${localities.join(',')}`;
+};
 
 export const PropertyContext = createContext<PropertyContextType | undefined>(undefined);
 
 export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isGuest } = useAuth();
+  const { showTransactionFeedback, showToast } = useFeedback();
   
   const [properties, setProperties] = useState<PropertyListing[]>([]);
   const [savedPropertyIds, setSavedPropertyIds] = useState<Set<string>>(new Set());
   const [savedProperties, setSavedProperties] = useState<PropertyListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasExactMatchesRemaining, setHasExactMatchesRemaining] = useState(true);
   
   const [imageUploadProgress, setImageUploadProgress] = useState(0);
   const [videoUploadProgress, setVideoUploadProgress] = useState(0);
   const [publishing, setPublishing] = useState(false);
   const [publishingStage, setPublishingStage] = useState('');
+  
+  const [discoveryMode, setDiscoveryModeState] = useState<DiscoveryMode>(DiscoveryMode.EXACT_MATCH);
+  const [flexibleLevel, setFlexibleLevel] = useState(1);
+  const [exploredLocalities, setExploredLocalities] = useState<string[]>([]);
   
   const [filters, setFiltersState] = useState<SearchFilters>({
     city: 'Mumbai',
@@ -107,46 +134,92 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [user, isGuest]);
 
-  const fetchFeed = useCallback(async () => {
+  const fetchFeed = useCallback(async (isPullToRefresh = false) => {
+    if (isPullToRefresh) {
+      feedCache = {};
+    }
     setRefreshing(true);
+    const startTime = Date.now();
+    const cacheKey = getFeedCacheKey(user?.id, filters, discoveryMode, flexibleLevel, exploredLocalities);
+    const cached = feedCache[cacheKey];
+
+    if (!isPullToRefresh && cached && Date.now() - cached.timestamp < 3 * 60 * 1000) {
+      setProperties(cached.items);
+      setHasExactMatchesRemaining(cached.hasMore);
+      const elapsed = Date.now() - startTime;
+      const delay = Math.max(0, 600 - elapsed);
+      setTimeout(() => {
+        setRefreshing(false);
+        setLoading(false);
+      }, delay);
+      return;
+    }
+
     try {
-      const items = await discoveryService.getRankedFeed(user?.id, undefined, 10, filters);
+      const items = await discoveryService.getRankedFeed(
+        user?.id,
+        undefined,
+        10,
+        filters,
+        discoveryMode,
+        flexibleLevel,
+        exploredLocalities
+      );
       setProperties(items);
-      setHasMore(items.length === 10);
+      const hasMore = items.length === 10;
+      setHasExactMatchesRemaining(hasMore);
+
+      feedCache[cacheKey] = {
+        items,
+        hasMore,
+        timestamp: Date.now(),
+      };
     } catch (e) {
       console.error('Failed to load feed listings from Supabase:', e);
       setProperties([]);
-      setHasMore(false);
+      setHasExactMatchesRemaining(false);
     } finally {
-      setRefreshing(false);
-      setLoading(false);
+      const elapsed = Date.now() - startTime;
+      const delay = Math.max(0, 600 - elapsed);
+      setTimeout(() => {
+        setRefreshing(false);
+        setLoading(false);
+      }, delay);
     }
-  }, [filters, user]);
+  }, [filters, user, discoveryMode, flexibleLevel, exploredLocalities]);
 
   useEffect(() => {
     fetchFeed();
   }, [fetchFeed]);
 
-  const loadMoreFeed = async () => {
-    if (!hasMore || refreshing) return;
+  const loadMoreFeed = useCallback(async () => {
+    if (!hasExactMatchesRemaining || refreshing) return;
 
     const lastItem = properties[properties.length - 1];
     const cursor = lastItem ? lastItem.createdAt : undefined;
 
     try {
-      const items = await discoveryService.getRankedFeed(user?.id, cursor, 10, filters);
+      const items = await discoveryService.getRankedFeed(
+        user?.id,
+        cursor,
+        10,
+        filters,
+        discoveryMode,
+        flexibleLevel,
+        exploredLocalities
+      );
       if (items.length > 0) {
         setProperties((prev) => [...prev, ...items]);
-        setHasMore(items.length === 10);
+        setHasExactMatchesRemaining(items.length === 10);
       } else {
-        setHasMore(false);
+        setHasExactMatchesRemaining(false);
       }
     } catch (e) {
       console.error('Error loading pagination details:', e);
     }
-  };
+  }, [hasExactMatchesRemaining, refreshing, properties, user, filters, discoveryMode, flexibleLevel, exploredLocalities]);
 
-  const toggleSave = async (id: string) => {
+  const toggleSave = useCallback(async (id: string) => {
     if (isGuest || !user) {
       return;
     }
@@ -159,10 +232,10 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const next = new Set(prev);
       if (wasSaved) {
         next.delete(id);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        hapticsService.warning();
       } else {
         next.add(id);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        hapticsService.success();
       }
       return next;
     });
@@ -196,13 +269,13 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       console.error('Failed to sync bookmark mutation with Supabase:', e);
       setSavedPropertyIds(previousIds);
       setSavedProperties(previousProperties);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Error', 'Failed to update saved home. Please check your connection.');
+      hapticsService.error();
+      showToast('Failed to update saved home. Please check your connection.', 'error');
     }
-  };
+  }, [isGuest, user, savedPropertyIds, savedProperties, properties, showToast]);
 
   // Atomic property publishing with complete transaction rollback
-  const publishListing = async (
+  const publishListing = useCallback(async (
     newListing: Omit<PropertyListing, 'id' | 'createdAt'>,
     imageUrls: string[],
     videoUri?: string,
@@ -291,16 +364,19 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         contactCount: 0,
       };
 
+      feedCache = {};
       setProperties((prev) => [newProperty, ...prev]);
       
       await fetchFeed();
       
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      hapticsService.success();
       setPublishingStage('Success');
+      showTransactionFeedback('success', 'Listing Published', 'Your property listing has been successfully uploaded and published to the live marketplace.');
     } catch (e) {
       console.error('Publishing pipeline transaction failed, starting rollback:', e);
       setPublishingStage('Failure');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      hapticsService.error();
+      showTransactionFeedback('error', 'Publish Failed', 'Failed to upload media assets. Please verify file sizes, formats, and connection stability.');
 
       if (propertyId) {
         try {
@@ -322,10 +398,10 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } finally {
       setPublishing(false);
     }
-  };
+  }, [fetchFeed, showTransactionFeedback]);
 
   // Sync edits using centralized propertyUploadService.syncMedia helper
-  const updateListing = async (
+  const updateListing = useCallback(async (
     id: string,
     updates: Omit<PropertyListing, 'id' | 'createdAt'>,
     imageUrls: string[],
@@ -373,23 +449,26 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         finalThumb
       );
 
+      feedCache = {};
       setProperties((prev) => prev.map((item) => (item.id === id ? updatedProperty : item)));
       
       await fetchFeed();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      hapticsService.success();
       setPublishingStage('Success');
+      showTransactionFeedback('success', 'Listing Updated', 'Your property details and media edits have been successfully synced and updated.');
     } catch (e) {
       console.error('Update transaction failed:', e);
       setPublishingStage('Failure');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      hapticsService.error();
+      showTransactionFeedback('error', 'Update Failed', 'Failed to update property details. Please verify changes and try again.');
       throw e;
     } finally {
       setPublishing(false);
     }
-  };
+  }, [properties, fetchFeed, showTransactionFeedback]);
 
   // Deletion sequence: Retrieve URLs -> Delete Storage media -> Delete Database record -> Invalidate & refresh
-  const deleteListing = async (id: string) => {
+  const deleteListing = useCallback(async (id: string) => {
     try {
       // 1. Retrieve all media metadata from state/database
       const previousProperty = properties.find(p => p.id === id);
@@ -404,44 +483,51 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       await propertyService.deleteListingHard(id);
 
       // 4. Refresh application state
+      feedCache = {};
       setProperties((prev) => prev.filter((item) => item.id !== id));
       await fetchFeed();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      hapticsService.warning();
+      showTransactionFeedback('success', 'Listing Deleted', 'The property listing has been permanently deleted from the marketplace and storage.');
     } catch (e) {
       console.error('Failed to delete property listing:', e);
+      showTransactionFeedback('error', 'Delete Failed', 'Failed to delete the listing from the server. Please try again.');
       throw e;
     }
-  };
+  }, [properties, fetchFeed, showTransactionFeedback]);
 
-  const archiveListing = async (id: string) => {
+  const archiveListing = useCallback(async (id: string) => {
     try {
       await propertyService.archiveListing(id);
+      feedCache = {};
       setProperties((prev) =>
         prev.map((item) => (item.id === id ? { ...item, status: 'archived' } : item))
       );
       await fetchFeed();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      hapticsService.warning();
+      showTransactionFeedback('warning', 'Listing Archived', 'The listing has been archived and removed from the active search recommendations.');
     } catch (e) {
       console.error('Failed to archive listing:', e);
       throw e;
     }
-  };
+  }, [fetchFeed, showTransactionFeedback]);
 
-  const restoreListing = async (id: string) => {
+  const restoreListing = useCallback(async (id: string) => {
     try {
       await propertyService.restoreListing(id);
+      feedCache = {};
       setProperties((prev) =>
         prev.map((item) => (item.id === id ? { ...item, status: 'published' } : item))
       );
       await fetchFeed();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      hapticsService.success();
+      showTransactionFeedback('success', 'Listing Restored', 'The listing has been restored and is now active on the marketplace search feed.');
     } catch (e) {
       console.error('Failed to restore listing:', e);
       throw e;
     }
-  };
+  }, [fetchFeed, showTransactionFeedback]);
 
-  const incrementViewCount = async (id: string) => {
+  const incrementViewCount = useCallback(async (id: string) => {
     if (id.startsWith('prop-')) {
       setProperties((prev) =>
         prev.map((item) =>
@@ -466,10 +552,22 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         item.id === id ? { ...item, viewCount: (item.viewCount || 0) + 1 } : item
       )
     );
-  };
+
+    // Track explored locality during current session
+    const viewedProperty = properties.find((p) => p.id === id);
+    if (viewedProperty && viewedProperty.locality) {
+      const normLoc = viewedProperty.locality.toLowerCase().trim();
+      setExploredLocalities((prev) => {
+        if (!prev.includes(normLoc)) {
+          return [...prev, normLoc];
+        }
+        return prev;
+      });
+    }
+  }, [user, isGuest, properties]);
 
 
-  const incrementContactCount = async (id: string) => {
+  const incrementContactCount = useCallback(async (id: string) => {
     if (id.startsWith('prop-')) return;
     try {
       await propertyService.incrementContactCount(id);
@@ -481,45 +579,87 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch (e) {
       console.warn('Failed to increment contact count:', e);
     }
-  };
+  }, []);
 
-  const setFilters = async (newFilters: SearchFilters) => {
+  const setFilters = useCallback(async (newFilters: SearchFilters) => {
     setFiltersState(newFilters);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setDiscoveryModeState(DiscoveryMode.EXACT_MATCH);
+    setFlexibleLevel(1);
+    setExploredLocalities([]);
+    hapticsService.light();
     try {
       await AsyncStorage.setItem('@filters', JSON.stringify(newFilters));
     } catch (e) {
       console.error(e);
     }
-  };
+  }, []);
+
+  const setDiscoveryMode = useCallback((mode: DiscoveryMode) => {
+    setDiscoveryModeState(mode);
+    if (mode === DiscoveryMode.EXACT_MATCH) {
+      setFlexibleLevel(1);
+      setExploredLocalities([]);
+    }
+  }, []);
+
+  const contextValue = useMemo(() => ({
+    properties,
+    filteredProperties: properties,
+    savedPropertyIds,
+    savedProperties,
+    filters,
+    toggleSave,
+    publishListing,
+    updateListing,
+    deleteListing,
+    archiveListing,
+    restoreListing,
+    incrementViewCount,
+    incrementContactCount,
+    setFilters,
+    loading,
+    refreshing,
+    fetchFeed,
+    loadMoreFeed,
+    imageUploadProgress,
+    videoUploadProgress,
+    publishing,
+    publishingStage,
+    discoveryMode,
+    setDiscoveryMode,
+    hasExactMatchesRemaining,
+    flexibleLevel,
+    setFlexibleLevel,
+  }), [
+    properties,
+    savedPropertyIds,
+    savedProperties,
+    filters,
+    toggleSave,
+    publishListing,
+    updateListing,
+    deleteListing,
+    archiveListing,
+    restoreListing,
+    incrementViewCount,
+    incrementContactCount,
+    setFilters,
+    loading,
+    refreshing,
+    fetchFeed,
+    loadMoreFeed,
+    imageUploadProgress,
+    videoUploadProgress,
+    publishing,
+    publishingStage,
+    discoveryMode,
+    setDiscoveryMode,
+    hasExactMatchesRemaining,
+    flexibleLevel,
+  ]);
 
   return (
-    <PropertyContext.Provider
-      value={{
-        properties,
-        filteredProperties: properties,
-        savedPropertyIds,
-        savedProperties,
-        filters,
-        toggleSave,
-        publishListing,
-        updateListing,
-        deleteListing,
-        archiveListing,
-        restoreListing,
-        incrementViewCount,
-        incrementContactCount,
-        setFilters,
-        loading,
-        refreshing,
-        fetchFeed,
-        loadMoreFeed,
-        imageUploadProgress,
-        videoUploadProgress,
-        publishing,
-        publishingStage,
-      }}
-    >
+    <PropertyContext.Provider value={contextValue}>
       {children}
     </PropertyContext.Provider>
   );

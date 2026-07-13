@@ -11,11 +11,13 @@ import { useProfile } from '../hooks/useProfile';
 import { Theme } from '../theme';
 import { ArrowLeft, Bell, Shield, LogOut, Camera } from 'lucide-react-native';
 import { propertyUploadService } from '../services/propertyUploadService';
+import { useFeedback } from '../context/FeedbackContext';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { signOut, isGuest } = useAuth();
   const { profile, updateProfile } = useProfile();
+  const { showTransactionFeedback } = useFeedback();
 
   const [name, setName] = useState(profile?.fullName || '');
   const [bio, setBio] = useState(profile?.bio || '');
@@ -70,10 +72,10 @@ export default function SettingsScreen() {
         preferredListingType: preferredListingType || undefined,
         preferredBudget: budgetNum,
       });
-      Alert.alert('Success', 'Profile and preferences updated successfully.');
+      showTransactionFeedback('success', 'Profile Updated', 'Your profile information and preferences have been successfully updated.');
     } catch (e) {
       console.error('Failed to update profile changes:', e);
-      Alert.alert('Error', 'Failed to save changes. Please try again.');
+      showTransactionFeedback('error', 'Update Failed', 'An error occurred while attempting to save your profile changes. Please try again.');
     } finally {
       setSaveLoading(false);
     }

@@ -36,6 +36,15 @@ export interface PropertyListing {
   saveCount?: number;
   contactCount?: number;
   deletedAt?: string;
+  locality?: string;
+  propertyType?: string;
+}
+
+export enum DiscoveryMode {
+  EXACT_MATCH = 'EXACT_MATCH',
+  FLEXIBLE_MATCH = 'FLEXIBLE_MATCH',
+  NEARBY = 'NEARBY',
+  REVISIT = 'REVISIT',
 }
 
 export interface SavedProperty {

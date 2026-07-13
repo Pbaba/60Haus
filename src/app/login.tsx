@@ -7,17 +7,19 @@ import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { useAuth } from '../hooks/useAuth';
 import { ArrowLeft } from 'lucide-react-native';
+import { useFeedback } from '../context/FeedbackContext';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { signIn } = useAuth();
+  const { showTransactionFeedback, showToast } = useFeedback();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
-      alert('Please complete all form fields.');
+      showToast('Please complete all form fields.', 'warning');
       return;
     }
     setLoading(true);
@@ -25,7 +27,7 @@ export default function LoginScreen() {
       await signIn(email, password);
       router.replace('/(tabs)' as any);
     } catch (error: any) {
-      alert(error.message || 'Login failed. Please verify credentials.');
+      showTransactionFeedback('error', 'Login Failed', error.message || 'Login failed. Please verify credentials.');
     } finally {
       setLoading(false);
     }

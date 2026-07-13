@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, FlatList } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, FlatList } from 'react-native';
 import { useRouter, useNavigation } from 'expo-router';
 import { ScreenContainer } from '../../components/ScreenContainer';
 import { Avatar } from '../../components/Avatar';
@@ -15,12 +15,14 @@ import { Image } from 'expo-image';
 import { Button } from '../../components/Button';
 import { historyService } from '../../services/historyService';
 import { PropertyListing } from '../../types';
+import { useFeedback } from '../../context/FeedbackContext';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const { isGuest } = useAuth();
   const { profile, upgradeToOwner } = useProfile();
+  const { showTransactionFeedback } = useFeedback();
   const { properties, savedProperties } = useProperties();
   const isOwner = profile?.role === 'owner';
 
@@ -56,9 +58,9 @@ export default function ProfileScreen() {
   const handleBecomeOwner = async () => {
     try {
       await upgradeToOwner();
-      Alert.alert('Success', 'Congratulations! You are now listed as a Property Owner.');
+      showTransactionFeedback('success', 'Owner Upgrade Complete', 'Congratulations! Your profile has been successfully upgraded to a Property Owner. You can now publish your listings.');
     } catch {
-      // Errors handled inside context alert callbacks
+      showTransactionFeedback('error', 'Upgrade Failed', 'Failed to upgrade profile to Owner. Please check your network connection and try again.');
     }
   };
 

@@ -318,13 +318,15 @@ export default function OwnerDashboardScreen() {
             {filteredListings.map(renderListingItem)}
           </View>
         ) : (
-          <FeedbackState
-            type="empty-listings"
-            title="Publish your first property."
-            subtitle="List walkthrough videos and get direct leads today."
-            onRetry={() => router.push('/owner/upload' as any)}
-            actionText="Create Listing"
-          />
+          <View style={styles.emptyContainer}>
+            <FeedbackState
+              type="empty-listings"
+              title="Publish your first property."
+              subtitle="List walkthrough videos and get direct leads today."
+              onRetry={() => router.push('/owner/upload' as any)}
+              actionText="Create Listing"
+            />
+          </View>
         )}
       </ScrollView>
 
@@ -412,16 +414,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Theme.spacing.md,
+    marginBottom: Theme.spacing.md,
   },
   kpiCard: {
-    flex: 1,
-    minWidth: '45%',
+    width: '47%',
     backgroundColor: Theme.colors.surface,
     padding: Theme.spacing.md,
     borderRadius: Theme.borderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
   },
   kpiVal: {
     fontSize: 22,
@@ -567,5 +571,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Theme.colors.surface,
+  },
+  emptyContainer: {
+    paddingVertical: Theme.spacing.xxxl,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
   },
 });

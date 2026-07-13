@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { UserProfile } from '../types';
 import { profileService } from '../services/profileService';
@@ -43,7 +43,7 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     fetchProfile();
   }, [user, isGuest]);
 
-  const updateProfile = async (updates: Partial<UserProfile>) => {
+  const updateProfile = useCallback(async (updates: Partial<UserProfile>) => {
     if (isGuest || !user) return;
 
     try {
@@ -57,9 +57,9 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
       alert('Failed to update profile. Please verify your connection.');
       throw err;
     }
-  };
+  }, [isGuest, user]);
 
-  const upgradeToOwner = async () => {
+  const upgradeToOwner = useCallback(async () => {
     if (isGuest || !user) return;
 
     try {
@@ -73,18 +73,18 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
       alert('Upgrade failed. Please verify your network.');
       throw err;
     }
-  };
+  }, [isGuest, user]);
+
+  const contextValue = useMemo(() => ({
+    profile,
+    loading,
+    updateProfile,
+    upgradeToOwner,
+    connectionError,
+  }), [profile, loading, updateProfile, upgradeToOwner, connectionError]);
 
   return (
-    <ProfileContext.Provider
-      value={{
-        profile,
-        loading,
-        updateProfile,
-        upgradeToOwner,
-        connectionError,
-      }}
-    >
+    <ProfileContext.Provider value={contextValue}>
       {children}
     </ProfileContext.Provider>
   );

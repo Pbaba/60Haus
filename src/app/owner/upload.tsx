@@ -12,6 +12,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { ArrowLeft, Image as ImageIcon, Video, X, CheckCircle } from 'lucide-react-native';
 import { Image } from 'expo-image';
 import { propertyUploadService, VideoAsset } from '../../services/propertyUploadService';
+import { useFeedback } from '../../context/FeedbackContext';
+import { profileService } from '../../services/profileService';
 
 export default function OwnerUploadScreen() {
   const router = useRouter();
@@ -25,8 +27,9 @@ export default function OwnerUploadScreen() {
     publishingStage,
     properties 
   } = useProperties();
-  const { profile, upgradeToOwner } = useProfile();
+  const { profile, upgradeToOwner, updateProfile } = useProfile();
   const { isGuest } = useAuth();
+  const { showToast } = useFeedback();
   
   // Route Protection Check
   useEffect(() => {
@@ -71,6 +74,9 @@ export default function OwnerUploadScreen() {
   const [bhk, setBhk] = useState('');
   const [furnishing, setFurnishing] = useState('fully-furnished');
   const [propertyType, setPropertyType] = useState('apartment');
+  const [description, setDescription] = useState('');
+  const [locality, setLocality] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
   
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
@@ -87,11 +93,28 @@ export default function OwnerUploadScreen() {
         setCity(property.city);
         setBhk(String(property.bedrooms));
         setFurnishing(property.furnishing);
+        setPropertyType(property.propertyType || 'apartment');
         setSelectedImages(property.imageUrls || []);
         setSelectedVideo(property.videoUrl || null);
+        setDescription(property.description || '');
+        setLocality(property.locality || '');
+
+        const loadOwnerPhone = async () => {
+          try {
+            const owner = await profileService.getProfile(property.ownerId);
+            setContactPhone(owner?.phoneNumber || '');
+          } catch {
+            setContactPhone('');
+          }
+        };
+        loadOwnerPhone();
+      }
+    } else {
+      if (profile?.phoneNumber) {
+        setContactPhone(profile.phoneNumber);
       }
     }
-  }, [id, properties]);
+  }, [id, properties, profile]);
 
   const handlePickImages = async () => {
     if (publishing) return;
@@ -143,7 +166,7 @@ export default function OwnerUploadScreen() {
         setSelectedVideo(asset.uri);
         setVideoAssetInfo(info);
       } catch (err: any) {
-        Alert.alert('Validation Error', err.message || 'Video validation failed.');
+        showToast(err.message || 'Video validation failed.', 'warning');
       }
     }
   };
@@ -163,31 +186,39 @@ export default function OwnerUploadScreen() {
     if (publishing) return; // Prevent duplicate submissions
 
     if (!title) {
-      Alert.alert('Validation Error', 'Listing Title is required.');
+      showToast('Listing Title is required.', 'warning');
       return;
     }
     if (!price || parseFloat(price) <= 0) {
-      Alert.alert('Validation Error', 'Please enter a valid price (greater than 0).');
+      showToast('Please enter a valid price (greater than 0).', 'warning');
       return;
     }
     if (!city) {
-      Alert.alert('Validation Error', 'City location is required.');
+      showToast('City location is required.', 'warning');
       return;
     }
     if (!propertyType) {
-      Alert.alert('Validation Error', 'Property Type selection is required.');
+      showToast('Property Type selection is required.', 'warning');
       return;
     }
     if (selectedImages.length === 0) {
-      Alert.alert('Validation Error', 'At least one property image is required.');
+      showToast('At least one property image is required.', 'warning');
       return;
     }
 
     try {
+      if (contactPhone && contactPhone !== profile?.phoneNumber) {
+        try {
+          await updateProfile({ phoneNumber: contactPhone });
+        } catch (phoneErr) {
+          console.warn('Failed to update contact phone on profile:', phoneErr);
+        }
+      }
+
       const listingData = {
         ownerId: profile!.id,
         title,
-        description: `Premium configuration located at ${address}, offering customized facilities.`,
+        description: description || `Premium configuration located at ${address}, offering customized facilities.`,
         price: parseFloat(price),
         address,
         city,
@@ -200,18 +231,17 @@ export default function OwnerUploadScreen() {
         thumbnailUrl: selectedImages[0],
         status: (id ? properties.find((p) => p.id === id)?.status : 'published') as any,
         amenities: ['Reserved Parking', 'Water Supply', '24x7 Security'],
+        locality: locality || address.split(',')[0] || '',
       };
 
       if (id) {
         await updateListing(id, listingData, selectedImages, selectedVideo || undefined, videoAssetInfo);
-        Alert.alert('Success', 'Listing updated successfully!');
       } else {
         await publishListing(listingData, selectedImages, selectedVideo || undefined, videoAssetInfo);
-        Alert.alert('Success', 'Property listing published successfully!');
       }
       router.replace('/(tabs)' as any);
-    } catch (e: any) {
-      Alert.alert('Error', e.message || `Failed to ${id ? 'update' : 'publish'} listing. Please retry.`);
+    } catch {
+      // Handled globally by publishing context pipeline overlays
     }
   };
 
@@ -306,10 +336,26 @@ export default function OwnerUploadScreen() {
           editable={!publishing}
         />
         <Input
+          label="Locality"
+          placeholder="e.g. Bandra West"
+          value={locality}
+          onChangeText={setLocality}
+          editable={!publishing}
+        />
+        <Input
           label="City"
           placeholder="e.g. Mumbai"
           value={city}
           onChangeText={setCity}
+          editable={!publishing}
+        />
+        <Input
+          label="Description"
+          placeholder="e.g. Spacious airy flat with sea views..."
+          value={description}
+          onChangeText={setDescription}
+          multiline
+          numberOfLines={4}
           editable={!publishing}
         />
         <Input
@@ -318,6 +364,14 @@ export default function OwnerUploadScreen() {
           keyboardType="numeric"
           value={bhk}
           onChangeText={setBhk}
+          editable={!publishing}
+        />
+        <Input
+          label="Owner Contact Number"
+          placeholder="e.g. +91 99999 88888"
+          value={contactPhone}
+          onChangeText={setContactPhone}
+          keyboardType="phone-pad"
           editable={!publishing}
         />
         

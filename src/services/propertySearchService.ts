@@ -34,6 +34,9 @@ export const propertySearchService = {
       if (filters.maxPrice !== undefined && filters.maxPrice > 0) {
         query = query.lte('price', filters.maxPrice);
       }
+      if (filters.localities && filters.localities.length > 0) {
+        query = query.in('locality', filters.localities);
+      }
     }
 
     // Cursor-based Pagination
@@ -61,6 +64,7 @@ export const propertySearchService = {
         price: Number(item.price),
         listingType: item.listing_type,
         city: item.city,
+        locality: item.locality,
         address: item.address,
         bedrooms: item.bedrooms,
         bathrooms: item.bathrooms,
