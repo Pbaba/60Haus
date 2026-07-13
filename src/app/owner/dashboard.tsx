@@ -8,6 +8,9 @@ import { Image } from 'expo-image';
 import { Button } from '../../components/Button';
 import { FeedbackState } from '../../components/FeedbackState';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
+import { FloatingDock } from '../../components/FloatingDock';
+import { APP_TABS } from '../../navigation/tabs';
+import { hapticsService } from '../../services/hapticsService';
 
 import { useProfile } from '../../hooks/useProfile';
 import { useProperties } from '../../hooks/useProperties';
@@ -20,6 +23,14 @@ import { PropertyListing } from '../../types';
 export default function OwnerDashboardScreen() {
   const router = useRouter();
   const navigation = useNavigation();
+
+  const handleTabPress = (key: string) => {
+    const tab = APP_TABS.find((t) => t.key === key);
+    if (tab && tab.key !== 'owner-dashboard') {
+      hapticsService.selection();
+      router.replace(tab.route as any);
+    }
+  };
 
   const { profile } = useProfile();
   const { deleteListing, archiveListing, restoreListing } = useProperties();
@@ -272,20 +283,32 @@ export default function OwnerDashboardScreen() {
         {/* KPI Panel */}
         <View style={styles.kpiContainer}>
           <Card style={styles.kpiCard}>
-            <Text style={styles.kpiVal}>{stats.totalListings}</Text>
-            <Text style={styles.kpiLabel}>Total Listings</Text>
-          </Card>
-          <Card style={styles.kpiCard}>
             <Text style={styles.kpiVal}>{stats.totalViews}</Text>
-            <Text style={styles.kpiLabel}>Total Views</Text>
+            <Text style={styles.kpiLabel}>Views</Text>
           </Card>
           <Card style={styles.kpiCard}>
             <Text style={styles.kpiVal}>{stats.totalSaves}</Text>
-            <Text style={styles.kpiLabel}>Total Saves</Text>
+            <Text style={styles.kpiLabel}>Saves</Text>
           </Card>
           <Card style={styles.kpiCard}>
             <Text style={styles.kpiVal}>{stats.totalContacts}</Text>
             <Text style={styles.kpiLabel}>Contacts</Text>
+          </Card>
+          <Card style={styles.kpiCard}>
+            <Text style={styles.kpiVal}>{stats.listings.filter((l) => l.status === 'published' || !l.status).length}</Text>
+            <Text style={styles.kpiLabel}>Published</Text>
+          </Card>
+          <Card style={styles.kpiCard}>
+            <Text style={styles.kpiVal}>{stats.listings.filter((l) => l.status === 'published' || !l.status).length}</Text>
+            <Text style={styles.kpiLabel}>Active Listings</Text>
+          </Card>
+          <Card style={styles.kpiCard}>
+            <Text style={styles.kpiVal}>{stats.listings.filter((l) => l.status === 'archived').length}</Text>
+            <Text style={styles.kpiLabel}>Archived</Text>
+          </Card>
+          <Card style={styles.kpiCard}>
+            <Text style={styles.kpiVal}>{stats.listings.filter((l) => l.status === 'draft').length}</Text>
+            <Text style={styles.kpiLabel}>Drafts</Text>
           </Card>
         </View>
 
@@ -361,6 +384,12 @@ export default function OwnerDashboardScreen() {
         onConfirm={handleRestoreConfirm}
         onCancel={() => !dialogLoading && setConfirmRestoreId(null)}
       />
+
+      <FloatingDock
+        tabs={APP_TABS}
+        activeTab="owner-dashboard"
+        onTabPress={handleTabPress}
+      />
     </ScreenContainer>
   );
 }
@@ -405,7 +434,7 @@ const styles = StyleSheet.create({
     padding: Theme.spacing.xs,
   },
   scrollContent: {
-    paddingBottom: Theme.spacing.xxxl,
+    paddingBottom: Theme.floatingDock.height + Theme.spacing.xxxl * 2,
     paddingHorizontal: Theme.spacing.xl,
     paddingTop: Theme.spacing.lg,
     gap: Theme.spacing.lg,

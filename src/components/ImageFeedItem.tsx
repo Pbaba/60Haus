@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { StyleSheet, View, Text, Pressable, Dimensions, FlatList } from 'react-native';
+import { StyleSheet, View, Text, Pressable, Dimensions, FlatList, Animated as RNAnimated } from 'react-native';
 import { Image } from 'expo-image';
 import { Bookmark } from 'lucide-react-native';
 import Animated, {
@@ -14,6 +14,8 @@ import { Theme } from '../theme';
 import { hapticsService } from '../services/hapticsService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const AnimatedImage = RNAnimated.createAnimatedComponent(Image);
+const AnimatedFlatList = RNAnimated.createAnimatedComponent(FlatList);
 
 interface ImageFeedItemProps {
   imageUrls: string[];
@@ -32,6 +34,7 @@ export const ImageFeedItem: React.FC<ImageFeedItemProps> = ({
 
   const [showHeart, setShowHeart] = useState(false);
   const lastTap = useRef<number>(0);
+  const scrollX = useRef(new RNAnimated.Value(0)).current;
   const heartScale = useSharedValue(0);
   const heartOpacity = useSharedValue(0);
 
@@ -67,18 +70,56 @@ export const ImageFeedItem: React.FC<ImageFeedItemProps> = ({
 
   return (
     <Pressable style={styles.container} onPress={handlePress}>
-      <FlatList
+      {/* Background Crossfading Layer */}
+      <View style={StyleSheet.absoluteFill}>
+        {images.map((uri, index) => {
+          const opacity = scrollX.interpolate({
+            inputRange: [
+              (index - 1) * SCREEN_WIDTH,
+              index * SCREEN_WIDTH,
+              (index + 1) * SCREEN_WIDTH,
+            ],
+            outputRange: [0, 1, 0],
+            extrapolate: 'clamp',
+          });
+
+          return (
+            <AnimatedImage
+              key={`bg-${index}`}
+              source={{ uri }}
+              style={[
+                styles.backgroundImage,
+                { opacity },
+              ]}
+              contentFit="cover"
+              blurRadius={32}
+            />
+          );
+        })}
+        {/* Subtle Dark Overlay to preserve text & control contrast */}
+        <View style={styles.darkOverlay} />
+      </View>
+
+      {/* Foreground Swipeable Image Gallery */}
+      <AnimatedFlatList
         data={images}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item, index) => index.toString()}
+        onScroll={RNAnimated.event(
+          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+          { useNativeDriver: true }
+        )}
+        scrollEventThrottle={16}
         renderItem={({ item }) => (
-          <Image
-            source={{ uri: item }}
-            style={styles.image}
-            contentFit="cover"
-          />
+          <View style={styles.foregroundWrapper}>
+            <Image
+              source={{ uri: item as string }}
+              style={styles.foregroundImage}
+              contentFit="contain"
+            />
+          </View>
         )}
         style={StyleSheet.absoluteFill}
       />
@@ -105,9 +146,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  image: {
+  backgroundImage: {
+    ...StyleSheet.absoluteFill,
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
+    transform: [{ scale: 1.15 }],
+  },
+  darkOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0, 0, 0, 0.40)',
+  },
+  foregroundWrapper: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  foregroundImage: {
+    width: SCREEN_WIDTH,
+    height: '100%',
   },
   imagesBadge: {
     position: 'absolute',

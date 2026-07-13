@@ -38,6 +38,8 @@ export interface PropertyListing {
   deletedAt?: string;
   locality?: string;
   propertyType?: string;
+  personalizationExplanations?: string[];
+  trustSignals?: string[];
 }
 
 export enum DiscoveryMode {

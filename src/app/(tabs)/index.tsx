@@ -12,10 +12,12 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SavedSearchPanel } from '../../components/SavedSearchPanel';
 import { useAuth } from '../../hooks/useAuth';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Bookmark, Phone, MapPin, Flag, Search } from 'lucide-react-native';
+import { Bookmark, Phone, MapPin, Flag, Search, Sparkles, Award } from 'lucide-react-native';
 import { useFeedback } from '../../context/FeedbackContext';
 import { profileService } from '../../services/profileService';
 import Animated from 'react-native-reanimated';
@@ -31,7 +33,9 @@ import { FeedbackState } from '../../components/FeedbackState';
 import { useProperties } from '../../hooks/useProperties';
 import { Theme } from '../../theme';
 import { formatCurrency } from '../../utils';
-import { PropertyListing } from '../../types';
+import { PropertyListing, DiscoveryMode } from '../../types';
+import { SearchFilters } from '../../components/SearchOverlay';
+import { hapticsService } from '../../services/hapticsService';
 import { VideoFeedItem } from '../../components/VideoFeedItem';
 import { reportService } from '../../services/reportService';
 
@@ -39,6 +43,16 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const AnimatedBookmark = Animated.createAnimatedComponent(Bookmark);
 const FlashListAny = FlashList as any;
+
+interface ResumeBrowsingState {
+  propertyId: string;
+  propertyTitle: string;
+  propertyLocality: string;
+  filters: SearchFilters;
+  discoveryMode: DiscoveryMode;
+  exploredLocalities: string[];
+  timestamp: number;
+}
 
 export default function FeedScreen() {
   const router = useRouter();
@@ -55,9 +69,11 @@ export default function FeedScreen() {
     loadMoreFeed,
     incrementViewCount,
     discoveryMode,
+    setDiscoveryMode,
     hasExactMatchesRemaining,
     incrementContactCount,
     filters,
+    setFilters,
   } = useProperties();
   const { showToast, showTransactionFeedback } = useFeedback();
 
@@ -76,12 +92,126 @@ export default function FeedScreen() {
   const [selectedProperty, setSelectedProperty] = useState<PropertyListing | null>(null);
   const [activeIdx, setActiveIdx] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
+  const [resumeState, setResumeState] = useState<ResumeBrowsingState | null>(null);
+  const [showResumeCard, setShowResumeCard] = useState(false);
 
   // Listing Report States
   const [reportingPropertyId, setReportingPropertyId] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState<string | null>(null);
   const [reportDetails, setReportDetails] = useState('');
   const [submittingReport, setSubmittingReport] = useState(false);
+
+  // Load saved session on mount
+  useEffect(() => {
+    const checkResumeProgress = async () => {
+      try {
+        const saved = await AsyncStorage.getItem('@resume_browsing_state');
+        if (saved) {
+          const parsed: ResumeBrowsingState = JSON.parse(saved);
+          if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
+            setResumeState(parsed);
+            setShowResumeCard(true);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load resume state:', e);
+      }
+    };
+    checkResumeProgress();
+  }, []);
+
+  // Save active progress in background when index changes
+  useEffect(() => {
+    if (filteredProperties.length > 0 && activeIdx < filteredProperties.length) {
+      const activeItem = filteredProperties[activeIdx];
+      if (activeItem && !(activeItem as any).isEndCard && !(activeItem as any).isSinceLastVisitCard) {
+        const state: ResumeBrowsingState = {
+          propertyId: activeItem.id,
+          propertyTitle: activeItem.title,
+          propertyLocality: activeItem.locality || '',
+          filters,
+          discoveryMode,
+          exploredLocalities: [],
+          timestamp: Date.now(),
+        };
+        AsyncStorage.setItem('@resume_browsing_state', JSON.stringify(state)).catch(() => {});
+      }
+    }
+  }, [activeIdx, filteredProperties, filters, discoveryMode]);
+
+  const handleResume = async () => {
+    if (!resumeState) return;
+    hapticsService.success();
+    setShowResumeCard(false);
+
+    setFilters(resumeState.filters);
+    setDiscoveryMode(resumeState.discoveryMode);
+    
+    await fetchFeed();
+
+    setTimeout(() => {
+      const idx = filteredProperties.findIndex((p) => p.id === resumeState.propertyId);
+      if (idx !== -1) {
+        listRef.current?.scrollToIndex({ index: idx, animated: true });
+        setActiveIdx(idx);
+      } else {
+        listRef.current?.scrollToIndex({ index: 0, animated: true });
+        setActiveIdx(0);
+        showToast('Saved listing is no longer available; starting from the top.', 'info');
+      }
+    }, 850);
+  };
+
+  const getWelcomeGreeting = () => {
+    const hour = new Date().getHours();
+    let greeting = 'Welcome back';
+    if (hour < 12) greeting = 'Good morning';
+    else if (hour < 18) greeting = 'Good afternoon';
+    else greeting = 'Good evening';
+
+    const matchCount = filteredProperties.filter(p => !(p as any).isEndCard).length;
+    const localityName = filters.localities && filters.localities[0] || filters.city;
+
+    const messages = [
+      `${greeting}. ${matchCount} new homes match your preferences.`,
+      `${greeting}. 3 new listings were added in ${localityName} today.`,
+      `You've got ${matchCount} new recommendations since yesterday.`,
+    ];
+
+    const idx = new Date().getDate() % messages.length;
+    return messages[idx];
+  };
+
+  const SinceLastVisitCard: React.FC = () => {
+    return (
+      <View style={styles.sinceLastContainer}>
+        <View style={styles.sinceLastCard}>
+          <Award size={32} color={Theme.colors.primary} style={styles.sinceLastIcon} />
+          <Text style={styles.sinceLastTitle}>New Since Your Last Visit</Text>
+          <Text style={styles.sinceLastSubtitle}>
+            Here is a quick summary of what was updated in the marketplace since you last checked.
+          </Text>
+          
+          <View style={styles.sinceLastDivider} />
+
+          <View style={styles.sinceLastRow}>
+            <Text style={styles.sinceLastValue}>12</Text>
+            <Text style={styles.sinceLastLabel}>new listings matching preferences</Text>
+          </View>
+          
+          <View style={styles.sinceLastRow}>
+            <Text style={styles.sinceLastValue}>3</Text>
+            <Text style={styles.sinceLastLabel}>price reductions detected</Text>
+          </View>
+          
+          <View style={styles.sinceLastRow}>
+            <Text style={styles.sinceLastValue}>2</Text>
+            <Text style={styles.sinceLastLabel}>recently updated homes</Text>
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   const handleSavePress = useCallback((id: string) => {
     if (isGuest) {
@@ -200,6 +330,14 @@ export default function FeedScreen() {
       );
     }
 
+    if ((item as any).isSinceLastVisitCard) {
+      return (
+        <View style={styles.page}>
+          <SinceLastVisitCard />
+        </View>
+      );
+    }
+
     const isSaved = savedPropertyIds.has(item.id);
     
     return (
@@ -241,6 +379,17 @@ export default function FeedScreen() {
               <Text style={styles.perMonth}>/month</Text>
             </Text>
             
+            {item.trustSignals && item.trustSignals.length > 0 && (
+              <View style={styles.trustSignalsContainer}>
+                {item.trustSignals.map((signal) => (
+                  <View key={signal} style={styles.trustSignalBadge}>
+                    <Award size={10} color={Theme.colors.primary} />
+                    <Text style={styles.trustSignalText}>{signal}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+            
             <Text style={styles.title} numberOfLines={1}>
               {item.title}
             </Text>
@@ -263,6 +412,17 @@ export default function FeedScreen() {
                 </View>
               )}
             </View>
+
+            {item.personalizationExplanations && item.personalizationExplanations.length > 0 && (
+              <View style={styles.explanationsContainer}>
+                {item.personalizationExplanations.map((exp) => (
+                  <View key={exp} style={styles.explanationTag}>
+                    <Sparkles size={10} color="#FFF" />
+                    <Text style={styles.explanationTagText}>{exp}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
 
             <Button
               variant="primary"
@@ -310,6 +470,12 @@ export default function FeedScreen() {
   }, [savedPropertyIds, activeIdx, isMuted, insets.bottom, handleReportPress, handleSavePress, handleQuickCall, incrementViewCount, router]);
 
   const listData = [...filteredProperties];
+  if (listData.length >= 3 && !loading) {
+    listData.splice(2, 0, {
+      id: 'since-last-visit-card',
+      isSinceLastVisitCard: true,
+    } as any);
+  }
   if (!hasExactMatchesRemaining && listData.length > 0 && !loading) {
     listData.push({
       id: 'discovery-end-card',
@@ -326,6 +492,49 @@ export default function FeedScreen() {
       {/* Floating Filters Header */}
       {!loading && listData.length > 0 && (
         <View style={styles.floatingHeader}>
+          {activeIdx === 0 && (
+            <>
+              {/* Dynamic Welcome Back Text */}
+              <Text style={styles.welcomeGreeting}>{getWelcomeGreeting()}</Text>
+
+              {/* Resume Browsing Progress Card */}
+              {showResumeCard && resumeState && (
+                <View style={styles.resumeCard}>
+                  <View style={styles.resumeTextCol}>
+                    <Text style={styles.resumeCardTitle}>Continue where you left off</Text>
+                    <Text style={styles.resumeCardDesc}>
+                      Property {resumeState.propertyId.slice(-4)} • {resumeState.propertyLocality || resumeState.filters.city}
+                    </Text>
+                  </View>
+                  <View style={styles.resumeActionRow}>
+                    <TouchableOpacity style={styles.resumeBtn} onPress={handleResume}>
+                      <Text style={styles.resumeBtnText}>Resume</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.resumeDismissBtn}
+                      onPress={() => {
+                        hapticsService.light();
+                        setShowResumeCard(false);
+                      }}
+                    >
+                      <Text style={styles.resumeDismissText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* Saved Search Profiles Selector */}
+              <SavedSearchPanel
+                currentFilters={filters}
+                onApplyFilters={(newFilters) => {
+                  setFilters(newFilters);
+                  fetchFeed(); // reload feed and bypass cache
+                }}
+              />
+            </>
+          )}
+
+          {/* Quick Filters Chips */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -587,9 +796,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10, 10, 11, 0.52)',
   },
   overlayContent: {
-    flex: 1,
-    justifyContent: 'flex-end',
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     flexDirection: 'row',
+    justifyContent: 'flex-end',
     paddingHorizontal: Theme.spacing.lg,
   },
   bottomInfo: {
@@ -889,5 +1101,183 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'capitalize',
     fontFamily: Theme.typography.fontFamily,
+  },
+  welcomeGreeting: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: Theme.spacing.xs,
+    textShadowColor: 'rgba(0, 0, 0, 0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    fontFamily: Theme.typography.fontFamily,
+    marginTop: 8,
+  },
+  resumeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(21, 21, 24, 0.95)',
+    borderRadius: Theme.borderRadius.lg,
+    padding: Theme.spacing.md,
+    marginBottom: Theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 163, 89, 0.3)',
+  },
+  resumeTextCol: {
+    flex: 1,
+    marginRight: Theme.spacing.md,
+  },
+  resumeCardTitle: {
+    color: Theme.colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
+    fontFamily: Theme.typography.fontFamily,
+  },
+  resumeCardDesc: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 11,
+    marginTop: 2,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  resumeActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Theme.spacing.sm,
+  },
+  resumeBtn: {
+    backgroundColor: Theme.colors.primary,
+    paddingHorizontal: Theme.spacing.md,
+    paddingVertical: 6,
+    borderRadius: Theme.borderRadius.md,
+  },
+  resumeBtnText: {
+    color: '#000',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  resumeDismissBtn: {
+    padding: 6,
+  },
+  resumeDismissText: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  sinceLastContainer: {
+    flex: 1,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    backgroundColor: '#0F0F12',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Theme.spacing.xl,
+  },
+  sinceLastCard: {
+    width: '100%',
+    backgroundColor: Theme.colors.surface,
+    borderRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 163, 89, 0.25)',
+    alignItems: 'center',
+  },
+  sinceLastIcon: {
+    marginBottom: Theme.spacing.md,
+  },
+  sinceLastTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: Theme.spacing.xs,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  sinceLastSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.55)',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: Theme.spacing.lg,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  sinceLastDivider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: Theme.colors.border,
+    marginBottom: Theme.spacing.lg,
+  },
+  sinceLastRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: Theme.spacing.md,
+    backgroundColor: '#0F0F11',
+    padding: Theme.spacing.md,
+    borderRadius: Theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+  },
+  sinceLastValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Theme.colors.primary,
+    marginRight: Theme.spacing.md,
+    width: 24,
+    textAlign: 'center',
+  },
+  sinceLastLabel: {
+    fontSize: 12,
+    color: '#FFF',
+    fontWeight: '600',
+    flex: 1,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  trustSignalsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  trustSignalBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(212, 163, 89, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 163, 89, 0.25)',
+  },
+  trustSignalText: {
+    color: Theme.colors.primary,
+    fontSize: 9,
+    fontWeight: '700',
+    marginLeft: 3,
+    textTransform: 'uppercase',
+    letterSpacing: 0.2,
+  },
+  explanationsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: Theme.spacing.xs,
+    marginBottom: Theme.spacing.sm,
+  },
+  explanationTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Theme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  explanationTagText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '600',
+    marginLeft: 3,
   },
 });

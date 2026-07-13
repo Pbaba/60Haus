@@ -27,7 +27,7 @@ export const DiscoveryEndScreen: React.FC<DiscoveryEndScreenProps> = ({
   onOpenFilters,
 }) => {
   const router = useRouter();
-  const { setDiscoveryMode, setFlexibleLevel } = useProperties();
+  const { filters, setFilters, setDiscoveryMode, setFlexibleLevel } = useProperties();
   const [transitioning, setTransitioning] = useState(false);
   const [transitionMessage, setTransitionMessage] = useState('');
 
@@ -109,6 +109,7 @@ export const DiscoveryEndScreen: React.FC<DiscoveryEndScreenProps> = ({
     }, 650);
   };
 
+
   const handleExpandSearch = () => {
     const messages = [
       'Finding more homes...',
@@ -117,7 +118,15 @@ export const DiscoveryEndScreen: React.FC<DiscoveryEndScreenProps> = ({
     ];
     
     runModeTransition(DiscoveryMode.FLEXIBLE_MATCH, () => {
-      setFlexibleLevel((prev) => Math.min(prev + 1, 3));
+      // If there is a maxPrice, expand it by 20%
+      if (filters.maxPrice) {
+        setFilters({
+          ...filters,
+          maxPrice: Math.round(filters.maxPrice * 1.2),
+        });
+      } else {
+        setFlexibleLevel((prev) => Math.min(prev + 1, 3));
+      }
       setDiscoveryMode(DiscoveryMode.FLEXIBLE_MATCH);
     }, messages);
   };
@@ -166,6 +175,10 @@ export const DiscoveryEndScreen: React.FC<DiscoveryEndScreenProps> = ({
     transform: [{ scale: cardScale4.value }],
   }));
 
+  const relaxedBudgetLabel = filters.maxPrice 
+    ? `Relax budget limit to ₹${Math.round(filters.maxPrice * 1.2 / 1000)}k to view more properties.`
+    : 'Relax your preferences slightly to discover more relevant homes.';
+
   return (
     <View style={styles.container}>
       <View style={styles.content}>
@@ -173,14 +186,14 @@ export const DiscoveryEndScreen: React.FC<DiscoveryEndScreenProps> = ({
           ✨ You're all caught up
         </Animated.Text>
         <Animated.Text style={[styles.subtitle, subtitleStyle]}>
-          We've shown you every property that closely matches your preferences. Let's discover even more.
+          We've shown you every property matching your preferences. Explore contextual options below.
         </Animated.Text>
 
         <View style={styles.grid}>
           <Animated.View style={[styles.cardWrapper, cardStyle1]}>
             <DiscoveryCard
-              title="Expand My Search"
-              description="Relax your preferences slightly to discover more relevant homes."
+              title={filters.maxPrice ? "Expand Budget by 20%" : "Expand My Search"}
+              description={relaxedBudgetLabel}
               IconComponent={Compass}
               onPress={handleExpandSearch}
             />
@@ -188,8 +201,8 @@ export const DiscoveryEndScreen: React.FC<DiscoveryEndScreenProps> = ({
 
           <Animated.View style={[styles.cardWrapper, cardStyle2]}>
             <DiscoveryCard
-              title="Explore Nearby"
-              description="Discover homes in nearby localities within your selected city."
+              title="Show Nearby Localities"
+              description={`Discover homes in neighbouring localities near ${filters.city}.`}
               IconComponent={SlidersHorizontal}
               onPress={handleExploreNearby}
             />
@@ -197,8 +210,8 @@ export const DiscoveryEndScreen: React.FC<DiscoveryEndScreenProps> = ({
 
           <Animated.View style={[styles.cardWrapper, cardStyle3]}>
             <DiscoveryCard
-              title="Saved Homes"
-              description="Continue reviewing the properties you've bookmarked."
+              title="Browse Saved Homes"
+              description="Review the listings you have bookmarked previously."
               IconComponent={Heart}
               onPress={handleSavedHomes}
             />
@@ -206,8 +219,8 @@ export const DiscoveryEndScreen: React.FC<DiscoveryEndScreenProps> = ({
 
           <Animated.View style={[styles.cardWrapper, cardStyle4]}>
             <DiscoveryCard
-              title="Adjust Preferences"
-              description="Update your budget, location or discovery preferences."
+              title="Update Preferences"
+              description="Change city, bedroom configuration, or budget constraints."
               IconComponent={Settings}
               onPress={handleAdjustPreferences}
             />
@@ -215,7 +228,7 @@ export const DiscoveryEndScreen: React.FC<DiscoveryEndScreenProps> = ({
         </View>
 
         <Animated.Text style={[styles.supportMessage, supportStyle]}>
-          ✨ Explore other options below to find your perfect home.
+          ✨ Tap any card to refresh your marketplace recommendation feed.
         </Animated.Text>
       </View>
 
