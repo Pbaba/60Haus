@@ -13,6 +13,7 @@ export interface SearchFilters {
   listingType: 'rent' | 'buy';
   minPrice?: number;
   maxPrice?: number;
+  localities?: string[];
 }
 
 export interface SearchOverlayProps {

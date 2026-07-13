@@ -7,10 +7,12 @@ import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { useAuth } from '../hooks/useAuth';
 import { ArrowLeft } from 'lucide-react-native';
+import { useFeedback } from '../context/FeedbackContext';
 
 export default function RegisterScreen() {
   const router = useRouter();
   const { signUp } = useAuth();
+  const { showTransactionFeedback, showToast } = useFeedback();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,20 +20,20 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (!name || !email || !password) {
-      alert('Please complete all form fields.');
+      showToast('Please complete all form fields.', 'warning');
       return;
     }
     if (password.length < 6) {
-      alert('Password must be at least 6 characters.');
+      showToast('Password must be at least 6 characters.', 'warning');
       return;
     }
     setLoading(true);
     try {
       await signUp(email, password, name);
-      alert('Account created successfully! You are now signed in.');
+      await showTransactionFeedback('success', 'Registration Successful', 'Welcome to 60house! Your account has been created successfully, and you are now signed in.');
       router.replace('/(tabs)' as any);
     } catch (error: any) {
-      alert(error.message || 'Registration failed. Please try again.');
+      showTransactionFeedback('error', 'Registration Failed', error.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }

@@ -53,6 +53,7 @@ export const bookmarkService = {
           price: Number(p.price),
           listingType: p.listing_type,
           city: p.city,
+          locality: p.locality,
           address: p.address,
           bedrooms: p.bedrooms,
           bathrooms: p.bathrooms,

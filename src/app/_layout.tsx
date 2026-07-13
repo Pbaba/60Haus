@@ -17,6 +17,8 @@ import { PropertyProvider } from '../context/PropertyContext';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { Theme } from '../theme';
 
+import { FeedbackProvider } from '../context/FeedbackContext';
+
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -41,34 +43,37 @@ export default function RootLayout() {
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          <AuthProvider>
-            <ProfileProvider>
-              <PropertyProvider>
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    contentStyle: {
-                      backgroundColor: Theme.colors.background,
-                    },
-                  }}
-                >
-                  <Stack.Screen name="index" />
-                  <Stack.Screen name="onboarding" />
-                  <Stack.Screen name="login" />
-                  <Stack.Screen name="register" />
-                  <Stack.Screen name="(tabs)" />
-                  <Stack.Screen
-                    name="owner/upload"
-                    options={{ presentation: 'modal' }}
-                  />
-                  <Stack.Screen
-                    name="settings"
-                    options={{ presentation: 'card' }}
-                  />
-                </Stack>
-              </PropertyProvider>
-            </ProfileProvider>
-          </AuthProvider>
+          <FeedbackProvider>
+            <AuthProvider>
+              <ProfileProvider>
+                <PropertyProvider>
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                      contentStyle: {
+                        backgroundColor: Theme.colors.background,
+                      },
+                    }}
+                  >
+                    <Stack.Screen name="index" />
+                    <Stack.Screen name="onboarding" />
+                    <Stack.Screen name="login" />
+                    <Stack.Screen name="register" />
+                    <Stack.Screen name="search" />
+                    <Stack.Screen name="(tabs)" />
+                    <Stack.Screen
+                      name="owner/upload"
+                      options={{ presentation: 'modal' }}
+                    />
+                    <Stack.Screen
+                      name="settings"
+                      options={{ presentation: 'card' }}
+                    />
+                  </Stack>
+                </PropertyProvider>
+              </ProfileProvider>
+            </AuthProvider>
+          </FeedbackProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>

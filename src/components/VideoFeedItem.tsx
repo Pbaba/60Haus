@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Pressable } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Image } from 'expo-image';
 import { Theme } from '../theme';
-import { RefreshCw, Volume2, VolumeX } from 'lucide-react-native';
+import { RefreshCw, Volume2, VolumeX, Heart } from 'lucide-react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withDelay, runOnJS } from 'react-native-reanimated';
+import { hapticsService } from '../services/hapticsService';
 
 interface VideoFeedItemProps {
   videoUrl: string;
@@ -12,20 +14,27 @@ interface VideoFeedItemProps {
   isMuted: boolean;
   onToggleMute: () => void;
   onViewCountIncrement: () => void;
+  onDoubleTapSave?: () => void;
+  shouldLoad: boolean;
 }
 
-export const VideoFeedItem: React.FC<VideoFeedItemProps> = ({
-  videoUrl,
-  thumbnailUrl,
-  isActive,
-  isMuted,
-  onToggleMute,
-  onViewCountIncrement,
-}) => {
-  const [isReady, setIsReady] = useState(false);
-  const [hasError, setHasError] = useState(false);
+interface ActivePlayerProps {
+  videoUrl: string;
+  isMuted: boolean;
+  isActive: boolean;
+  onViewCountIncrement: () => void;
+  setIsReady: (ready: boolean) => void;
+  setHasError: (error: boolean) => void;
+}
 
-  // Initialize expo-video player
+const ActiveVideoPlayer: React.FC<ActivePlayerProps> = ({
+  videoUrl,
+  isMuted,
+  isActive,
+  onViewCountIncrement,
+  setIsReady,
+  setHasError,
+}) => {
   const player = useVideoPlayer(videoUrl, (p) => {
     p.loop = true;
     p.muted = isMuted;
@@ -50,14 +59,12 @@ export const VideoFeedItem: React.FC<VideoFeedItemProps> = ({
       }, 2000);
     } else {
       player.pause();
-      player.currentTime = 0; // Restart playback on revisit
-      setIsReady(false);
     }
 
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [isActive, player, onViewCountIncrement]);
+  }, [isActive, player, onViewCountIncrement, setHasError]);
 
   // Listen to player status
   useEffect(() => {
@@ -78,26 +85,87 @@ export const VideoFeedItem: React.FC<VideoFeedItemProps> = ({
       playSub.remove();
       errorSub.remove();
     };
-  }, [player]);
+  }, [player, setIsReady, setHasError]);
+
+  return (
+    <VideoView
+      player={player}
+      style={StyleSheet.absoluteFill}
+      contentFit="cover"
+      nativeControls={false}
+    />
+  );
+};
+
+const VideoFeedItemComponent: React.FC<VideoFeedItemProps> = ({
+  videoUrl,
+  thumbnailUrl,
+  isActive,
+  isMuted,
+  onToggleMute,
+  onViewCountIncrement,
+  onDoubleTapSave,
+  shouldLoad,
+}) => {
+  const [isReady, setIsReady] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [showHeart, setShowHeart] = useState(false);
+
+  const lastTap = useRef<number>(0);
+  const heartScale = useSharedValue(0);
+  const heartOpacity = useSharedValue(0);
+
+  const triggerHeartAnimation = () => {
+    setShowHeart(true);
+    heartScale.value = 0;
+    heartOpacity.value = 0;
+
+    heartScale.value = withSpring(1.3, { damping: 10, stiffness: 200 }, () => {
+      heartScale.value = withSpring(1, { damping: 12 });
+    });
+    heartOpacity.value = withTiming(1, { duration: 180 }, () => {
+      heartOpacity.value = withDelay(400, withTiming(0, { duration: 200 }, () => {
+        runOnJS(setShowHeart)(false);
+      }));
+    });
+  };
+
+  const handlePress = () => {
+    const now = Date.now();
+    if (now - lastTap.current < 320) {
+      hapticsService.light();
+      triggerHeartAnimation();
+      onDoubleTapSave?.();
+    }
+    lastTap.current = now;
+  };
+
+  const heartStyle = useAnimatedStyle(() => ({
+    opacity: heartOpacity.value,
+    transform: [{ scale: heartScale.value }],
+  }));
 
   const handleRetry = () => {
     setHasError(false);
     setIsReady(false);
-    player.play();
   };
 
   return (
-    <View style={styles.container}>
-      {/* Video view component */}
-      <VideoView
-        player={player}
-        style={StyleSheet.absoluteFill}
-        contentFit="cover"
-        nativeControls={false}
-      />
+    <Pressable style={styles.container} onPress={handlePress}>
+      {/* Conditionally mount ActiveVideoPlayer based on shouldLoad */}
+      {shouldLoad && (
+        <ActiveVideoPlayer
+          videoUrl={videoUrl}
+          isMuted={isMuted}
+          isActive={isActive}
+          onViewCountIncrement={onViewCountIncrement}
+          setIsReady={setIsReady}
+          setHasError={setHasError}
+        />
+      )}
 
       {/* Thumbnail loader layer (fades out when video starts playing) */}
-      {(!isReady || hasError) && thumbnailUrl && (
+      {(!isReady || hasError || !shouldLoad) && thumbnailUrl && (
         <Image
           source={{ uri: thumbnailUrl }}
           style={StyleSheet.absoluteFill}
@@ -106,14 +174,14 @@ export const VideoFeedItem: React.FC<VideoFeedItemProps> = ({
       )}
 
       {/* Spinner state while loading */}
-      {!isReady && !hasError && (
+      {shouldLoad && !isReady && !hasError && (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color={Theme.colors.primary} />
         </View>
       )}
 
       {/* Playback Error overlay */}
-      {hasError && (
+      {shouldLoad && hasError && (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Failed to load video</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={handleRetry}>
@@ -123,7 +191,7 @@ export const VideoFeedItem: React.FC<VideoFeedItemProps> = ({
         </View>
       )}
 
-      {/* Global sound toggle floating control */}
+      {/* Sound toggle control */}
       <TouchableOpacity style={styles.muteBtn} onPress={onToggleMute}>
         {isMuted ? (
           <VolumeX size={18} color="#FFF" />
@@ -131,9 +199,18 @@ export const VideoFeedItem: React.FC<VideoFeedItemProps> = ({
           <Volume2 size={18} color="#FFF" />
         )}
       </TouchableOpacity>
-    </View>
+
+      {/* Double tap pop-up Heart */}
+      {showHeart && (
+        <Animated.View style={[styles.heartOverlay, heartStyle]}>
+          <Heart size={72} color="#FFFFFF" fill="#FFFFFF" />
+        </Animated.View>
+      )}
+    </Pressable>
   );
 };
+
+export const VideoFeedItem = React.memo(VideoFeedItemComponent);
 
 const styles = StyleSheet.create({
   container: {
@@ -146,6 +223,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  heartOverlay: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    width: 110,
+    height: 110,
+    borderRadius: 55,
   },
   errorContainer: {
     position: 'absolute',

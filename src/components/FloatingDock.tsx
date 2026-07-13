@@ -5,10 +5,13 @@ import {
   TouchableOpacity,
   Animated,
   Platform,
+  Dimensions,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Theme } from '../theme';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export interface TabItem {
   key: string;
@@ -20,12 +23,14 @@ export interface FloatingDockProps {
   tabs: TabItem[];
   activeTab: string;
   onTabPress: (key: string) => void;
+  scrollX?: Animated.Value;
 }
 
 export const FloatingDock: React.FC<FloatingDockProps> = ({
   tabs,
   activeTab,
   onTabPress,
+  scrollX,
 }) => {
   const insets = useSafeAreaInsets();
   const [containerWidth, setContainerWidth] = useState(0);
@@ -35,7 +40,7 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
   const tabWidth = containerWidth / tabs.length;
 
   useEffect(() => {
-    if (containerWidth > 0 && activeIndex !== -1) {
+    if (!scrollX && containerWidth > 0 && activeIndex !== -1) {
       Animated.spring(slideAnim, {
         toValue: activeIndex * tabWidth,
         damping: Theme.motion.presets.floatingDock.damping,
@@ -44,11 +49,19 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
         useNativeDriver: true,
       }).start();
     }
-  }, [activeIndex, tabWidth, containerWidth, slideAnim]);
+  }, [activeIndex, tabWidth, containerWidth, slideAnim, scrollX]);
 
   const onLayout = (e: any) => {
     setContainerWidth(e.nativeEvent.layout.width);
   };
+
+  const activeTranslateX = scrollX && containerWidth > 0
+    ? scrollX.interpolate({
+        inputRange: tabs.map((_, i) => i * SCREEN_WIDTH),
+        outputRange: tabs.map((_, i) => i * tabWidth),
+        extrapolate: 'clamp',
+      })
+    : slideAnim;
 
   const content = (
     <View style={styles.content} onLayout={onLayout}>
@@ -59,7 +72,7 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
             styles.underline,
             {
               width: tabWidth - 36,
-              transform: [{ translateX: Animated.add(slideAnim, 18) }],
+              transform: [{ translateX: Animated.add(activeTranslateX, 18) }],
             },
           ]}
         />

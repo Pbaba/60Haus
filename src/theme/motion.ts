@@ -3,10 +3,12 @@ import { Easing } from 'react-native';
 export const Motion = {
   // Reusable animation durations (ms)
   duration: {
-    instant: 0,
+    instant: 100,
     fast: 150,
     normal: 250,
     slow: 400,
+    major: 600,
+    confirm: 800,
     verySlow: 600,
   },
 
@@ -20,6 +22,11 @@ export const Motion = {
 
   // Physics-based spring presets for Reanimated / Animated APIs
   springs: {
+    fast: {
+      damping: 15,
+      stiffness: 220,
+      mass: 0.8,
+    },
     default: {
       damping: 20,
       stiffness: 150,

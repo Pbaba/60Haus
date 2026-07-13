@@ -8,6 +8,7 @@ import { Button } from '../../components/Button';
 import { Avatar } from '../../components/Avatar';
 import { Skeleton } from '../../components/Skeleton';
 import { FeedbackState } from '../../components/FeedbackState';
+import { FullscreenGallery } from '../../components/FullscreenGallery';
 import { useProperties } from '../../hooks/useProperties';
 import { useAuth } from '../../hooks/useAuth';
 import { profileService } from '../../services/profileService';
@@ -30,6 +31,7 @@ export default function PropertyDetailScreen() {
   const [related, setRelated] = useState<PropertyListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
 
   const isSaved = id ? savedPropertyIds.has(id) : false;
 
@@ -288,12 +290,17 @@ export default function PropertyDetailScreen() {
               <Text style={styles.sectionTitle}>Image Gallery</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryScroll}>
                 {property.imageUrls.map((url, index) => (
-                  <Image
+                  <TouchableOpacity
                     key={index}
-                    source={{ uri: url }}
-                    style={styles.galleryImage}
-                    contentFit="cover"
-                  />
+                    activeOpacity={0.9}
+                    onPress={() => setGalleryIndex(index)}
+                  >
+                    <Image
+                      source={{ uri: url }}
+                      style={styles.galleryImage}
+                      contentFit="cover"
+                    />
+                  </TouchableOpacity>
                 ))}
               </ScrollView>
             </View>
@@ -373,6 +380,15 @@ export default function PropertyDetailScreen() {
           </Button>
         </View>
       </ScrollView>
+
+      {galleryIndex !== null && (
+        <FullscreenGallery
+          visible={galleryIndex !== null}
+          images={property?.imageUrls || []}
+          initialIndex={galleryIndex}
+          onClose={() => setGalleryIndex(null)}
+        />
+      )}
     </ScreenContainer>
   );
 }

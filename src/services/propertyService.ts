@@ -22,6 +22,8 @@ export const propertyService = {
         thumbnail_url: 'placeholder', // Updated later with final upload path
         amenities: listing.amenities || [],
         status: listing.status || 'published',
+        property_type: listing.propertyType,
+        locality: listing.locality,
       })
       .select('id')
       .single();
@@ -145,6 +147,8 @@ export const propertyService = {
       createdAt: new Date().toISOString(),
       imageUrls,
       amenities: listing.amenities,
+      propertyType: listing.propertyType,
+      locality: listing.locality,
     };
   },
 
@@ -170,6 +174,8 @@ export const propertyService = {
         furnishing: updates.furnishing,
         thumbnail_url: generatedThumbnailUrl || updates.thumbnailUrl,
         status: updates.status || 'published',
+        property_type: updates.propertyType,
+        locality: updates.locality,
       })
       .eq('id', id)
       .select()
@@ -238,6 +244,8 @@ export const propertyService = {
       status: propData.status,
       imageUrls,
       amenities: propData.amenities,
+      propertyType: propData.property_type,
+      locality: propData.locality,
     };
   },
 
@@ -275,6 +283,8 @@ export const propertyService = {
         viewCount: item.view_count || 0,
         saveCount: item.save_count || 0,
         contactCount: item.contact_count || 0,
+        propertyType: item.property_type,
+        locality: item.locality,
       };
     });
   },
