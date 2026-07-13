@@ -5,13 +5,7 @@ import { supabase } from '../lib/supabase';
 import { bookmarkService } from './bookmarkService';
 import { historyService } from './historyService';
 
-const PERSONALIZATION_WEIGHTS = {
-  city: 0.3,
-  listingType: 0.2,
-  budget: 0.1,
-  savedSimilarity: 0.15,
-  recentHistory: 0.1,
-};
+import { personalizationService } from './personalizationService';
 
 export interface DiscoveryStrategyInput {
   filters?: SearchFilters;
@@ -32,78 +26,18 @@ export interface DiscoveryStrategy {
   getRankedFeed(input: DiscoveryStrategyInput): DiscoveryStrategyResult;
 }
 
-// 1. Shared ranking algorithm functions
-function computeListingScore(
-  item: PropertyListing,
-  nowTimestamp: number,
-  userPref?: any,
-  savedProperties?: PropertyListing[],
-  recentlyViewedProperties?: PropertyListing[]
-): number {
-  const ageInMs = nowTimestamp - new Date(item.createdAt).getTime();
-  const ageInDays = Math.max(0, ageInMs / (1000 * 60 * 60 * 24));
-  const freshness = 1.0 / (1.0 + ageInDays);
-
-  let sponsoredBoost = 0;
-  const raw = item as any;
-  if (raw.is_sponsored || raw.isSponsored) {
-    sponsoredBoost = 1.0 + (raw.priorityScore || raw.priority_score || 0.0);
-  }
-
-  let personalizationScore = 0;
-
-  if (userPref) {
-    if (userPref.preferredCity && item.city.toLowerCase() === userPref.preferredCity.toLowerCase()) {
-      personalizationScore += PERSONALIZATION_WEIGHTS.city;
-    }
-    if (userPref.preferredListingType && item.listingType === userPref.preferredListingType) {
-      personalizationScore += PERSONALIZATION_WEIGHTS.listingType;
-    }
-    if (userPref.preferredBudget && item.price <= userPref.preferredBudget) {
-      personalizationScore += PERSONALIZATION_WEIGHTS.budget;
-    }
-  }
-
-  if (savedProperties && savedProperties.length > 0) {
-    const hasSimilarSaved = savedProperties.some(
-      (p) =>
-        p.city.toLowerCase() === item.city.toLowerCase() &&
-        p.bedrooms === item.bedrooms &&
-        p.listingType === item.listingType
-    );
-    if (hasSimilarSaved) {
-      personalizationScore += PERSONALIZATION_WEIGHTS.savedSimilarity;
-    }
-  }
-
-  if (recentlyViewedProperties && recentlyViewedProperties.length > 0) {
-    const hasSimilarViewed = recentlyViewedProperties.some(
-      (p) =>
-        p.city.toLowerCase() === item.city.toLowerCase() &&
-        p.bedrooms === item.bedrooms &&
-        p.listingType === item.listingType
-    );
-    if (hasSimilarViewed) {
-      personalizationScore += PERSONALIZATION_WEIGHTS.recentHistory;
-    }
-  }
-
-  return freshness + sponsoredBoost + personalizationScore;
-}
-
 function rankListings(
   listings: PropertyListing[],
   userPref?: any,
-  savedProperties?: PropertyListing[],
-  recentlyViewedProperties?: PropertyListing[]
+  savedProperties: PropertyListing[] = [],
+  recentlyViewedProperties: PropertyListing[] = []
 ): PropertyListing[] {
-  const now = new Date().getTime();
-  
-  return [...listings].sort((a, b) => {
-    const scoreA = computeListingScore(a, now, userPref, savedProperties, recentlyViewedProperties);
-    const scoreB = computeListingScore(b, now, userPref, savedProperties, recentlyViewedProperties);
-    return scoreB - scoreA;
-  });
+  return personalizationService.rankProperties(
+    listings,
+    userPref,
+    savedProperties,
+    recentlyViewedProperties
+  );
 }
 
 // 2. Exact Match Strategy
