@@ -6,7 +6,8 @@ export const personalizationService = {
     item: PropertyListing,
     userProfile?: any,
     savedProperties: PropertyListing[] = [],
-    recentlyViewedProperties: PropertyListing[] = []
+    recentlyViewedProperties: PropertyListing[] = [],
+    precomputedLocalityCounts?: Record<string, number>
   ): { score: number; explanations: string[]; trustSignals: string[] } {
     let score = 0;
     const explanations: string[] = [];
@@ -34,19 +35,22 @@ export const personalizationService = {
     }
 
     // 2. Locality affinity scoring
-    const localityCounts: Record<string, number> = {};
-    recentlyViewedProperties.forEach((p) => {
-      if (p.locality) {
-        const loc = p.locality.toLowerCase().trim();
-        localityCounts[loc] = (localityCounts[loc] || 0) + 1;
-      }
-    });
-    savedProperties.forEach((p) => {
-      if (p.locality) {
-        const loc = p.locality.toLowerCase().trim();
-        localityCounts[loc] = (localityCounts[loc] || 0) + 3; // Saved homes have higher affinity weight
-      }
-    });
+    let localityCounts = precomputedLocalityCounts;
+    if (!localityCounts) {
+      localityCounts = {};
+      recentlyViewedProperties.forEach((p) => {
+        if (p.locality) {
+          const loc = p.locality.toLowerCase().trim();
+          localityCounts![loc] = (localityCounts![loc] || 0) + 1;
+        }
+      });
+      savedProperties.forEach((p) => {
+        if (p.locality) {
+          const loc = p.locality.toLowerCase().trim();
+          localityCounts![loc] = (localityCounts![loc] || 0) + 3; // Saved homes have higher affinity weight
+        }
+      });
+    }
 
     if (item.locality) {
       const itemLoc = item.locality.toLowerCase().trim();
@@ -136,12 +140,28 @@ export const personalizationService = {
     savedProperties: PropertyListing[] = [],
     recentlyViewedProperties: PropertyListing[] = []
   ): PropertyListing[] {
+    // Precompute locality counts once
+    const localityCounts: Record<string, number> = {};
+    recentlyViewedProperties.forEach((p) => {
+      if (p.locality) {
+        const loc = p.locality.toLowerCase().trim();
+        localityCounts[loc] = (localityCounts[loc] || 0) + 1;
+      }
+    });
+    savedProperties.forEach((p) => {
+      if (p.locality) {
+        const loc = p.locality.toLowerCase().trim();
+        localityCounts[loc] = (localityCounts[loc] || 0) + 3;
+      }
+    });
+
     const scoredListings = candidateListings.map((item) => {
       const { score, explanations, trustSignals } = this.computeListingScore(
         item,
         userProfile,
         savedProperties,
-        recentlyViewedProperties
+        recentlyViewedProperties,
+        localityCounts
       );
       
       return {

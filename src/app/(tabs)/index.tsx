@@ -16,16 +16,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SavedSearchPanel } from '../../components/SavedSearchPanel';
 import { useAuth } from '../../hooks/useAuth';
 import { Image } from 'expo-image';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Bookmark, Phone, MapPin, Flag, Search, Sparkles, Award } from 'lucide-react-native';
+import { Search, Award } from 'lucide-react-native';
 import { useFeedback } from '../../context/FeedbackContext';
 import { profileService } from '../../services/profileService';
-import Animated from 'react-native-reanimated';
 import { ScreenContainer } from '../../components/ScreenContainer';
 import { Button } from '../../components/Button';
 import { DiscoveryEndScreen } from '../../components/DiscoveryEndScreen';
 import { SkeletonFeed } from '../../components/Skeleton';
-import { ImageFeedItem } from '../../components/ImageFeedItem';
+import { FeedItemCell } from '../../components/FeedItemCell';
 import { Input } from '../../components/Input';
 import { Avatar } from '../../components/Avatar';
 import { BottomSheet } from '../../components/BottomSheet';
@@ -36,12 +34,11 @@ import { formatCurrency } from '../../utils';
 import { PropertyListing, DiscoveryMode } from '../../types';
 import { SearchFilters } from '../../components/SearchOverlay';
 import { hapticsService } from '../../services/hapticsService';
-import { VideoFeedItem } from '../../components/VideoFeedItem';
 import { reportService } from '../../services/reportService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const AnimatedBookmark = Animated.createAnimatedComponent(Bookmark);
+
 const FlashListAny = FlashList as any;
 
 interface ResumeBrowsingState {
@@ -57,7 +54,6 @@ interface ResumeBrowsingState {
 export default function FeedScreen() {
   const router = useRouter();
   const { isGuest } = useAuth();
-  const insets = useSafeAreaInsets();
   const {
     properties,
     filteredProperties,
@@ -267,9 +263,9 @@ export default function FeedScreen() {
     fetchFeed();
   };
 
-  const handlePropertyPress = (property: PropertyListing) => {
+  const handlePropertyPress = useCallback((property: PropertyListing) => {
     setSelectedProperty(property);
-  };
+  }, []);
 
   const handleQuickCall = useCallback(async (item: PropertyListing) => {
     try {
@@ -341,133 +337,21 @@ export default function FeedScreen() {
     const isSaved = savedPropertyIds.has(item.id);
     
     return (
-      <View style={styles.page}>
-        {item.videoUrl ? (
-          <VideoFeedItem
-            videoUrl={item.videoUrl}
-            thumbnailUrl={item.thumbnailUrl}
-            isActive={isActive}
-            isMuted={isMuted}
-            onToggleMute={() => setIsMuted(prev => !prev)}
-            onViewCountIncrement={() => incrementViewCount(item.id)}
-            onDoubleTapSave={() => handleSavePress(item.id)}
-            shouldLoad={isActive || index === activeIdx + 1}
-          />
-        ) : (
-          <ImageFeedItem
-            imageUrls={item.imageUrls || []}
-            thumbnailUrl={item.thumbnailUrl}
-            onDoubleTapSave={() => handleSavePress(item.id)}
-          />
-        )}
-        
-        <View style={styles.gradientOverlay} />
-
-        <View
-          style={[
-            styles.overlayContent,
-            { paddingBottom: insets.bottom + Theme.floatingDock.height + Theme.spacing.lg },
-          ]}
-        >
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => handlePropertyPress(item)}
-            style={styles.bottomInfo}
-          >
-            <Text style={styles.price}>
-              {formatCurrency(item.price)}
-              <Text style={styles.perMonth}>/month</Text>
-            </Text>
-            
-            {item.trustSignals && item.trustSignals.length > 0 && (
-              <View style={styles.trustSignalsContainer}>
-                {item.trustSignals.map((signal) => (
-                  <View key={signal} style={styles.trustSignalBadge}>
-                    <Award size={10} color={Theme.colors.primary} />
-                    <Text style={styles.trustSignalText}>{signal}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-            
-            <Text style={styles.title} numberOfLines={1}>
-              {item.title}
-            </Text>
-            
-            <Text style={styles.location}>
-              <MapPin size={16} color={Theme.colors.textSecondary} />
-              {item.address}, {item.city}
-            </Text>
-
-            <View style={styles.tagsContainer}>
-              <View style={styles.tag}>
-                <Text style={styles.tagText}>{item.bedrooms} BHK</Text>
-              </View>
-              <View style={styles.tag}>
-                <Text style={styles.tagText}>{item.furnishing.replace('-', ' ')}</Text>
-              </View>
-              {item.viewCount !== undefined && (
-                <View style={styles.tag}>
-                  <Text style={styles.tagText}>{item.viewCount} views</Text>
-                </View>
-              )}
-            </View>
-
-            {item.personalizationExplanations && item.personalizationExplanations.length > 0 && (
-              <View style={styles.explanationsContainer}>
-                {item.personalizationExplanations.map((exp) => (
-                  <View key={exp} style={styles.explanationTag}>
-                    <Sparkles size={10} color="#FFF" />
-                    <Text style={styles.explanationTagText}>{exp}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            <Button
-              variant="primary"
-              style={styles.contactBtn}
-              onPress={() => handleQuickCall(item)}
-            >
-              Contact Owner
-            </Button>
-          </TouchableOpacity>
-
-          <View style={styles.sidebar}>
-            {/* Save Action */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[styles.sidebarBtn, isSaved && styles.sidebarBtnActive]}
-              onPress={() => handleSavePress(item.id)}
-            >
-              <AnimatedBookmark
-                size={22}
-                color={isSaved ? Theme.colors.primary : Theme.colors.textPrimary}
-              />
-            </TouchableOpacity>
-
-            {/* Quick Call Action */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={styles.sidebarBtn}
-              onPress={() => handleQuickCall(item)}
-            >
-              <Phone size={20} color={Theme.colors.textPrimary} />
-            </TouchableOpacity>
-
-            {/* Report Listing Flag Button */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={styles.sidebarBtn}
-              onPress={() => handleReportPress(item.id)}
-            >
-              <Flag size={18} color={Theme.colors.textPrimary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
+      <FeedItemCell
+        item={item}
+        isActive={isActive}
+        isSaved={isSaved}
+        isMuted={isMuted}
+        shouldLoad={isActive || index === activeIdx + 1}
+        onToggleMute={() => setIsMuted(prev => !prev)}
+        onViewCountIncrement={() => incrementViewCount(item.id)}
+        onSavePress={handleSavePress}
+        onQuickCall={handleQuickCall}
+        onReportPress={handleReportPress}
+        onPropertyPress={handlePropertyPress}
+      />
     );
-  }, [savedPropertyIds, activeIdx, isMuted, insets.bottom, handleReportPress, handleSavePress, handleQuickCall, incrementViewCount, router]);
+  }, [savedPropertyIds, activeIdx, isMuted, handleReportPress, handleSavePress, handleQuickCall, incrementViewCount, handlePropertyPress, router]);
 
   const listData = [...filteredProperties];
   if (listData.length >= 3 && !loading) {

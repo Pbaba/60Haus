@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { hapticsService } from '../services/hapticsService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PropertyListing, DiscoveryMode } from '../types';
@@ -9,6 +9,7 @@ import { propertyUploadService, VideoAsset } from '../services/propertyUploadSer
 import { bookmarkService } from '../services/bookmarkService';
 import { historyService } from '../services/historyService';
 import { useAuth } from '../hooks/useAuth';
+import { useProfile } from '../hooks/useProfile';
 import { useFeedback } from './FeedbackContext';
 
 interface PropertyContextType {
@@ -72,14 +73,26 @@ const getFeedCacheKey = (
 export const PropertyContext = createContext<PropertyContextType | undefined>(undefined);
 
 export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isGuest } = useAuth();
+  const { user, isGuest, loading: authLoading } = useAuth();
+  const { profile } = useProfile();
   const { showTransactionFeedback, showToast } = useFeedback();
-  
+
   const [properties, setProperties] = useState<PropertyListing[]>([]);
   const [savedPropertyIds, setSavedPropertyIds] = useState<Set<string>>(new Set());
   const [savedProperties, setSavedProperties] = useState<PropertyListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const savedPropertiesRef = useRef(savedProperties);
+  const profileRef = useRef(profile);
+
+  useEffect(() => {
+    savedPropertiesRef.current = savedProperties;
+  }, [savedProperties]);
+
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
   const [hasExactMatchesRemaining, setHasExactMatchesRemaining] = useState(true);
   
   const [imageUploadProgress, setImageUploadProgress] = useState(0);
@@ -163,7 +176,11 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         filters,
         discoveryMode,
         flexibleLevel,
-        exploredLocalities
+        exploredLocalities,
+        {
+          profile: profileRef.current,
+          savedProperties: savedPropertiesRef.current,
+        }
       );
       setProperties(items);
       const hasMore = items.length === 10;
@@ -189,8 +206,9 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [filters, user, discoveryMode, flexibleLevel, exploredLocalities]);
 
   useEffect(() => {
+    if (authLoading) return;
     fetchFeed();
-  }, [fetchFeed]);
+  }, [fetchFeed, authLoading]);
 
   const loadMoreFeed = useCallback(async () => {
     if (!hasExactMatchesRemaining || refreshing) return;
@@ -206,7 +224,11 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         filters,
         discoveryMode,
         flexibleLevel,
-        exploredLocalities
+        exploredLocalities,
+        {
+          profile: profileRef.current,
+          savedProperties: savedPropertiesRef.current,
+        }
       );
       if (items.length > 0) {
         setProperties((prev) => [...prev, ...items]);
