@@ -173,7 +173,12 @@ export const discoveryService = {
     filters?: SearchFilters,
     mode: DiscoveryMode = DiscoveryMode.EXACT_MATCH,
     flexibleLevel: number = 1,
-    exploredLocalities: string[] = []
+    exploredLocalities: string[] = [],
+    cachedData?: {
+      profile?: any;
+      savedProperties?: PropertyListing[];
+      recentlyViewed?: PropertyListing[];
+    }
   ): Promise<PropertyListing[]> {
     let userPref: any = undefined;
     let saved: PropertyListing[] = [];
@@ -181,21 +186,26 @@ export const discoveryService = {
 
     if (userId) {
       try {
-        const [profileRes, savedRes, recentRes] = await Promise.all([
-          supabase.from('profiles').select('*').eq('id', userId).single(),
-          bookmarkService.getSavedProperties(userId).catch(() => []),
-          historyService.getRecentViews(userId).catch(() => []),
-        ]);
-        const profile = profileRes.data;
+        const useCacheProfile = cachedData && cachedData.profile !== undefined;
+        const profile = useCacheProfile 
+          ? cachedData.profile 
+          : (await supabase.from('profiles').select('*').eq('id', userId).single()).data;
+
         if (profile) {
           userPref = {
-            preferredCity: profile.preferred_city,
-            preferredListingType: profile.preferred_listing_type,
-            preferredBudget: profile.preferred_budget,
+            preferredCity: profile.preferred_city || profile.preferredCity,
+            preferredListingType: profile.preferred_listing_type || profile.preferredListingType,
+            preferredBudget: profile.preferred_budget || profile.preferredBudget,
           };
         }
-        saved = savedRes;
-        recent = recentRes;
+
+        saved = cachedData && cachedData.savedProperties !== undefined 
+          ? cachedData.savedProperties 
+          : await bookmarkService.getSavedProperties(userId).catch(() => []);
+
+        recent = cachedData && cachedData.recentlyViewed !== undefined 
+          ? cachedData.recentlyViewed 
+          : await historyService.getRecentViews(userId).catch(() => []);
       } catch (e) {
         console.warn('Discovery inputs load failed:', e);
       }

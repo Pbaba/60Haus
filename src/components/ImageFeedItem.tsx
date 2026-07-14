@@ -23,7 +23,7 @@ interface ImageFeedItemProps {
   onDoubleTapSave?: () => void;
 }
 
-export const ImageFeedItem: React.FC<ImageFeedItemProps> = ({
+const ImageFeedItemComponent: React.FC<ImageFeedItemProps> = ({
   imageUrls,
   thumbnailUrl,
   onDoubleTapSave,
@@ -138,6 +138,13 @@ export const ImageFeedItem: React.FC<ImageFeedItemProps> = ({
     </Pressable>
   );
 };
+
+export const ImageFeedItem = React.memo(ImageFeedItemComponent, (prev, next) => {
+  return (
+    prev.thumbnailUrl === next.thumbnailUrl &&
+    prev.imageUrls === next.imageUrls
+  );
+});
 
 const styles = StyleSheet.create({
   container: {
