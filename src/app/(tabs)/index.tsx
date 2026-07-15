@@ -22,8 +22,10 @@ import { profileService } from '../../services/profileService';
 import { ScreenContainer } from '../../components/ScreenContainer';
 import { Button } from '../../components/Button';
 import { DiscoveryEndScreen } from '../../components/DiscoveryEndScreen';
-import { SkeletonFeed } from '../../components/Skeleton';
 import { FeedItemCell } from '../../components/FeedItemCell';
+import { AMENITIES } from '../../constants/property';
+import { SkeletonFeed } from '../../components/Skeleton';
+import { locationDomain, reactNativeMapProvider, NeighborhoodSnapshot } from '../../domain/location';
 import { Input } from '../../components/Input';
 import { Avatar } from '../../components/Avatar';
 import { BottomSheet } from '../../components/BottomSheet';
@@ -90,6 +92,34 @@ export default function FeedScreen() {
   const [isMuted, setIsMuted] = useState(false);
   const [resumeState, setResumeState] = useState<ResumeBrowsingState | null>(null);
   const [showResumeCard, setShowResumeCard] = useState(false);
+
+  // Geographic Locality States
+  const [snapshot, setSnapshot] = useState<NeighborhoodSnapshot | null>(null);
+  const [activeLocationTab, setActiveLocationTab] = useState('Snapshot');
+  const [loadingSnapshot, setLoadingSnapshot] = useState(false);
+
+  useEffect(() => {
+    if (selectedProperty) {
+      setLoadingSnapshot(true);
+      setSnapshot(null);
+      setActiveLocationTab('Snapshot');
+      
+      const loadSnapshot = async () => {
+        try {
+          const snap = await locationDomain.getNeighborhoodSnapshot(selectedProperty, properties);
+          setSnapshot(snap);
+        } catch (e) {
+          console.warn('Failed to load neighborhood details:', e);
+        } finally {
+          setLoadingSnapshot(false);
+        }
+      };
+      
+      loadSnapshot();
+    } else {
+      setSnapshot(null);
+    }
+  }, [selectedProperty, properties]);
 
   // Listing Report States
   const [reportingPropertyId, setReportingPropertyId] = useState<string | null>(null);
@@ -517,7 +547,7 @@ export default function FeedScreen() {
             <View style={styles.sheetBody}>
               <Text style={styles.sheetPrice}>
                 {formatCurrency(selectedProperty.price)}
-                <Text style={styles.sheetPerMonth}>/month</Text>
+                {selectedProperty.listingType === 'rent' && <Text style={styles.sheetPerMonth}>/month</Text>}
               </Text>
               <Text style={styles.sheetAddress}>
                 {selectedProperty.address}, {selectedProperty.city}
@@ -534,10 +564,257 @@ export default function FeedScreen() {
                   <Text style={styles.sheetSpecLabel}>Bathrooms</Text>
                 </View>
                 <View style={styles.sheetSpecItem}>
-                  <Text style={styles.sheetSpecValue}>1,450 sq ft</Text>
+                  <Text style={styles.sheetSpecValue}>
+                    {(() => {
+                      const area = selectedProperty.carpetArea || selectedProperty.builtUpArea || selectedProperty.superBuiltUpArea || selectedProperty.plotArea || 0;
+                      return area > 0 ? `${area} sq ft` : 'N/A';
+                    })()}
+                  </Text>
                   <Text style={styles.sheetSpecLabel}>Size</Text>
                 </View>
               </View>
+
+              {/* Detailed Specifications List */}
+              <View style={styles.sheetDetailedSpecs}>
+                {selectedProperty.listingType === 'rent' ? (
+                  <>
+                    <View style={styles.specRow}>
+                      <Text style={styles.specLabel}>Security Deposit</Text>
+                      <Text style={styles.specValue}>{selectedProperty.securityDeposit ? formatCurrency(selectedProperty.securityDeposit) : 'N/A'}</Text>
+                    </View>
+                    <View style={styles.specRow}>
+                      <Text style={styles.specLabel}>Maintenance / month</Text>
+                      <Text style={styles.specValue}>{selectedProperty.monthlyMaintenance ? formatCurrency(selectedProperty.monthlyMaintenance) : 'N/A'}</Text>
+                    </View>
+                    <View style={styles.specRow}>
+                      <Text style={styles.specLabel}>Brokerage Fee</Text>
+                      <Text style={styles.specValue}>{selectedProperty.brokerage ? formatCurrency(selectedProperty.brokerage) : 'N/A'}</Text>
+                    </View>
+                    <View style={styles.specRow}>
+                      <Text style={styles.specLabel}>Lease Duration</Text>
+                      <Text style={styles.specValue}>{selectedProperty.leaseDuration ? `${selectedProperty.leaseDuration} Months` : 'N/A'}</Text>
+                    </View>
+                    <View style={styles.specRow}>
+                      <Text style={styles.specLabel}>Available From</Text>
+                      <Text style={styles.specValue}>{selectedProperty.availableFrom || 'Immediate'}</Text>
+                    </View>
+                    <View style={styles.specRow}>
+                      <Text style={styles.specLabel}>Preferred Tenant</Text>
+                      <Text style={[styles.specValue, { textTransform: 'capitalize' }]}>{selectedProperty.preferredTenant || 'Anyone'}</Text>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.specRow}>
+                      <Text style={styles.specLabel}>Carpet Area</Text>
+                      <Text style={styles.specValue}>{selectedProperty.carpetArea ? `${selectedProperty.carpetArea} sq ft` : 'N/A'}</Text>
+                    </View>
+                    <View style={styles.specRow}>
+                      <Text style={styles.specLabel}>Built-up Area</Text>
+                      <Text style={styles.specValue}>{selectedProperty.builtUpArea ? `${selectedProperty.builtUpArea} sq ft` : 'N/A'}</Text>
+                    </View>
+                    <View style={styles.specRow}>
+                      <Text style={styles.specLabel}>Super Built-up Area</Text>
+                      <Text style={styles.specValue}>{selectedProperty.superBuiltUpArea ? `${selectedProperty.superBuiltUpArea} sq ft` : 'N/A'}</Text>
+                    </View>
+                    <View style={styles.specRow}>
+                      <Text style={styles.specLabel}>Property Age</Text>
+                      <Text style={styles.specValue}>{selectedProperty.propertyAge ? `${selectedProperty.propertyAge} Years` : 'N/A'}</Text>
+                    </View>
+                    <View style={styles.specRow}>
+                      <Text style={styles.specLabel}>Possession Status</Text>
+                      <Text style={[styles.specValue, { textTransform: 'capitalize' }]}>{selectedProperty.possessionStatus?.replace('-', ' ') || 'N/A'}</Text>
+                    </View>
+                    <View style={styles.specRow}>
+                      <Text style={styles.specLabel}>Ownership Type</Text>
+                      <Text style={[styles.specValue, { textTransform: 'capitalize' }]}>{selectedProperty.ownershipType?.replace('-', ' ') || 'N/A'}</Text>
+                    </View>
+                  </>
+                )}
+              </View>
+
+              {/* Geographic Neighborhood Snapshot & Locality Tabs */}
+              {loadingSnapshot ? (
+                <View style={[styles.snapshotCard, { alignItems: 'center', justifyContent: 'center', minHeight: 100 }]}>
+                  <Text style={{ color: Theme.colors.textSecondary, fontSize: 13 }}>Analyzing locality connectivity...</Text>
+                </View>
+              ) : snapshot ? (
+                <View style={styles.sheetSection}>
+                  <Text style={styles.sheetSectionTitle}>Locality Intelligence</Text>
+                  
+                  {/* Location Tabs Bar */}
+                  <View style={styles.locationTabsBar}>
+                    {['Snapshot', 'Interactive Map', 'Nearby Places', 'Commute Times', 'Market Trends'].map((tab) => {
+                      const active = activeLocationTab === tab;
+                      return (
+                        <TouchableOpacity
+                          key={tab}
+                          style={[styles.locationTabBtn, active && styles.locationTabBtnActive]}
+                          onPress={() => setActiveLocationTab(tab)}
+                        >
+                          <Text style={[styles.locationTabBtnText, active && styles.locationTabBtnTextActive]}>
+                            {tab}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {/* Tab Body Contents */}
+                  {activeLocationTab === 'Snapshot' && (
+                    <View style={styles.snapshotCard}>
+                      <Text style={styles.snapshotTitle}>Neighborhood Snapshot</Text>
+                      
+                      {/* Lifestyle Insight Tags */}
+                      {snapshot.lifestyleTags && snapshot.lifestyleTags.length > 0 && (
+                        <View style={styles.lifestyleContainer}>
+                          {snapshot.lifestyleTags.map((tag) => (
+                            <View key={tag} style={styles.lifestyleChip}>
+                              <Text style={styles.lifestyleChipText}>{tag}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+
+                      <View style={styles.snapshotGrid}>
+                        {(() => {
+                          const metro = snapshot.nearbyPlaces.find(p => p.subcategory === 'Metro Station');
+                          if (!metro) return null;
+                          return (
+                            <View style={styles.snapshotBadge}>
+                              <Text style={styles.snapshotBadgeText}>🚇 Metro • {metro.distance}m</Text>
+                            </View>
+                          );
+                        })()}
+                        {(() => {
+                          const hospital = snapshot.nearbyPlaces.find(p => p.subcategory === 'Hospital');
+                          if (!hospital) return null;
+                          return (
+                            <View style={styles.snapshotBadge}>
+                              <Text style={styles.snapshotBadgeText}>🏥 Hospital • {hospital.distance}m</Text>
+                            </View>
+                          );
+                        })()}
+                        {(() => {
+                          const park = snapshot.nearbyPlaces.find(p => p.subcategory === 'Park');
+                          if (!park) return null;
+                          return (
+                            <View style={styles.snapshotBadge}>
+                              <Text style={styles.snapshotBadgeText}>🌳 Park • {park.distance}m</Text>
+                            </View>
+                          );
+                        })()}
+                        {(() => {
+                          const cafe = snapshot.nearbyPlaces.find(p => p.subcategory === 'Cafe');
+                          if (!cafe) return null;
+                          return (
+                            <View style={styles.snapshotBadge}>
+                              <Text style={styles.snapshotBadgeText}>☕ Cafe • {cafe.distance}m</Text>
+                            </View>
+                          );
+                        })()}
+                        {(() => {
+                          const school = snapshot.nearbyPlaces.find(p => p.subcategory === 'School');
+                          if (!school) return null;
+                          return (
+                            <View style={styles.snapshotBadge}>
+                              <Text style={styles.snapshotBadgeText}>🏫 School • {school.distance}m</Text>
+                            </View>
+                          );
+                        })()}
+                      </View>
+                    </View>
+                  )}
+
+                  {activeLocationTab === 'Interactive Map' && (
+                    <View style={[styles.tabBodyContent, { height: 200, borderRadius: Theme.borderRadius.md, overflow: 'hidden', padding: 0 }]}>
+                      {reactNativeMapProvider.renderMap(
+                        { latitude: selectedProperty.latitude || 0, longitude: selectedProperty.longitude || 0 },
+                        snapshot.nearbyPlaces
+                      )}
+                    </View>
+                  )}
+
+                  {activeLocationTab === 'Nearby Places' && (
+                    <View style={styles.tabBodyContent}>
+                      {snapshot.nearbyPlaces.slice(0, 5).map((place) => (
+                        <View key={place.id} style={styles.nearbyPlaceItem}>
+                          <View style={{ flex: 1, gap: 2 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Text style={{ fontSize: 12, fontWeight: '600', color: Theme.colors.textPrimary }} numberOfLines={1}>
+                                {place.name}
+                              </Text>
+                              <Text style={styles.categorySubText}>{place.subcategory}</Text>
+                            </View>
+                            {place.optionalRating && (
+                              <Text style={{ fontSize: 10, color: '#f59e0b', fontWeight: 'bold' }}>
+                                ★ {place.optionalRating} rating
+                              </Text>
+                            )}
+                          </View>
+                          <Text style={{ fontSize: 11, color: Theme.colors.textSecondary }}>
+                            {place.distance}m • {place.estimatedTravelTime} mins
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {activeLocationTab === 'Commute Times' && (
+                    <View style={styles.tabBodyContent}>
+                      {snapshot.commuteHighlights.slice(0, 5).map((est, idx) => (
+                        <View key={idx} style={styles.commuteItem}>
+                          <View style={{ gap: 2 }}>
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: Theme.colors.textPrimary }}>{est.destination}</Text>
+                            <Text style={{ fontSize: 10, color: Theme.colors.textSecondary, textTransform: 'capitalize' }}>
+                              via {est.transportMode}
+                            </Text>
+                          </View>
+                          <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                            <Text style={{ fontSize: 12, fontWeight: 'bold', color: Theme.colors.primary }}>
+                              {est.estimatedDuration} mins
+                            </Text>
+                            <Text style={{ fontSize: 9, color: Theme.colors.textSecondary }}>
+                              {(est.distance / 1000).toFixed(1)} km
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {activeLocationTab === 'Market Trends' && (
+                    <View style={styles.tabBodyContent}>
+                      {snapshot.localityMetrics ? (
+                        <View style={styles.marketCard}>
+                          <View style={styles.marketRow}>
+                            <Text style={styles.marketLabel}>Average Price per Sq.ft</Text>
+                            <Text style={styles.marketValue}>{formatCurrency(snapshot.localityMetrics.averagePricePerSqft)}</Text>
+                          </View>
+                          <View style={styles.marketRow}>
+                            <Text style={styles.marketLabel}>Median Rent / month</Text>
+                            <Text style={styles.marketValue}>{formatCurrency(snapshot.localityMetrics.medianRent)}</Text>
+                          </View>
+                          <View style={styles.marketRow}>
+                            <Text style={styles.marketLabel}>Median Sale Price</Text>
+                            <Text style={styles.marketValue}>{formatCurrency(snapshot.localityMetrics.medianSalePrice)}</Text>
+                          </View>
+                          <View style={styles.marketRow}>
+                            <Text style={styles.marketLabel}>Active Area Listings</Text>
+                            <Text style={styles.marketValue}>{snapshot.localityMetrics.activeListings} active</Text>
+                          </View>
+                          <View style={styles.marketRow}>
+                            <Text style={styles.marketLabel}>Listing Density</Text>
+                            <Text style={styles.marketValue}>{snapshot.localityMetrics.listingDensity} / sq km</Text>
+                          </View>
+                        </View>
+                      ) : (
+                        <Text style={{ color: Theme.colors.textSecondary, fontSize: 12 }}>Locality market pricing trends unavailable.</Text>
+                      )}
+                    </View>
+                  )}
+                </View>
+              ) : null}
 
               {/* Description */}
               <View style={styles.sheetSection}>
@@ -549,11 +826,18 @@ export default function FeedScreen() {
               <View style={styles.sheetSection}>
                 <Text style={styles.sheetSectionTitle}>Amenities</Text>
                 <View style={styles.sheetAmenities}>
-                  {['WiFi Connection', 'Swimming Pool', 'Gymnasium', 'Reserved Parking'].map((a) => (
-                    <View key={a} style={styles.amenityChip}>
-                      <Text style={styles.amenityText}>{a}</Text>
-                    </View>
-                  ))}
+                  {selectedProperty.amenities && selectedProperty.amenities.length > 0 ? (
+                    selectedProperty.amenities.map((amenityId) => {
+                      const resolvedAmenity = AMENITIES.find(a => a.id === amenityId);
+                      return (
+                        <View key={amenityId} style={styles.amenityChip}>
+                          <Text style={styles.amenityText}>{resolvedAmenity ? resolvedAmenity.label : amenityId}</Text>
+                        </View>
+                      );
+                    })
+                  ) : (
+                    <Text style={{ color: Theme.colors.textSecondary, fontSize: 13 }}>No listed amenities.</Text>
+                  )}
                 </View>
               </View>
 
@@ -573,15 +857,21 @@ export default function FeedScreen() {
                 </View>
               </View>
 
-              {/* Map Placeholder */}
-              <View style={styles.sheetSection}>
-                <Text style={styles.sheetSectionTitle}>Location map</Text>
-                <View style={styles.mapPlaceholder}>
-                  <Text style={styles.mapPlaceholderText}>
-                    [ Satellite Map Location View ]
-                  </Text>
+              {/* Quick Directions Button */}
+              {selectedProperty?.latitude && selectedProperty?.longitude && (
+                <View style={styles.sheetSection}>
+                  <Button
+                    variant="secondary"
+                    style={{ width: '100%' }}
+                    onPress={() => {
+                      const url = `https://www.google.com/maps/dir/?api=1&destination=${selectedProperty.latitude},${selectedProperty.longitude}`;
+                      Linking.openURL(url);
+                    }}
+                  >
+                    Get Directions in Google Maps
+                  </Button>
                 </View>
-              </View>
+              )}
 
               {/* Action Button */}
               <Button
@@ -808,6 +1098,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Theme.colors.border,
   },
+  sheetDetailedSpecs: {
+    backgroundColor: Theme.colors.backgroundSecondary,
+    borderRadius: Theme.borderRadius.md,
+    padding: Theme.spacing.md,
+    gap: Theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    marginTop: Theme.spacing.sm,
+  },
+  specRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  specLabel: {
+    fontSize: Theme.typography.sizes.sm,
+    color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  specValue: {
+    fontSize: Theme.typography.sizes.sm,
+    fontWeight: Theme.typography.weights.semiBold,
+    color: Theme.colors.textPrimary,
+    fontFamily: Theme.typography.fontFamily,
+  },
   sheetSpecItem: {
     alignItems: 'center',
     gap: 2,
@@ -895,6 +1210,142 @@ const styles = StyleSheet.create({
   mapPlaceholderText: {
     color: Theme.colors.textSecondary,
     fontSize: Theme.typography.sizes.sm,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  snapshotCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    borderRadius: Theme.borderRadius.md,
+    padding: Theme.spacing.md,
+    marginTop: Theme.spacing.sm,
+    gap: Theme.spacing.xs,
+  },
+  snapshotTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Theme.colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  snapshotGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Theme.spacing.xs,
+    marginTop: 4,
+  },
+  snapshotBadge: {
+    paddingVertical: 5,
+    paddingHorizontal: Theme.spacing.md,
+    backgroundColor: Theme.colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    borderRadius: Theme.borderRadius.full,
+  },
+  snapshotBadgeText: {
+    fontSize: 11,
+    color: Theme.colors.textPrimary,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  locationTabsBar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginBottom: Theme.spacing.md,
+  },
+  locationTabBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: Theme.spacing.md,
+    borderRadius: Theme.borderRadius.full,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    backgroundColor: Theme.colors.backgroundSecondary,
+  },
+  locationTabBtnActive: {
+    borderColor: Theme.colors.primary,
+    backgroundColor: Theme.colors.primary + '15',
+  },
+  locationTabBtnText: {
+    fontSize: 11,
+    color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  locationTabBtnTextActive: {
+    color: Theme.colors.primary,
+    fontWeight: 'bold',
+  },
+  tabBodyContent: {
+    padding: Theme.spacing.sm,
+    backgroundColor: Theme.colors.backgroundSecondary,
+    borderRadius: Theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    minHeight: 120,
+    gap: Theme.spacing.xs,
+  },
+  nearbyPlaceItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.border + '30',
+  },
+  categorySubText: {
+    fontSize: 10,
+    color: Theme.colors.textSecondary,
+    backgroundColor: Theme.colors.border + '30',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  commuteItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.border + '30',
+  },
+  marketCard: {
+    gap: 8,
+  },
+  marketRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  marketLabel: {
+    fontSize: 12,
+    color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  marketValue: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: Theme.colors.textPrimary,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  lifestyleContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Theme.spacing.xs,
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  lifestyleChip: {
+    paddingVertical: 4,
+    paddingHorizontal: Theme.spacing.md,
+    backgroundColor: Theme.colors.primary + '08',
+    borderColor: Theme.colors.primary + '40',
+    borderWidth: 1,
+    borderRadius: Theme.borderRadius.full,
+  },
+  lifestyleChipText: {
+    fontSize: 11,
+    color: Theme.colors.primary,
+    fontWeight: 'bold',
     fontFamily: Theme.typography.fontFamily,
   },
   sheetContactBtn: {

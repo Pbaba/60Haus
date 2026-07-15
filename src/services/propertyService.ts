@@ -1,11 +1,19 @@
 import { supabase } from '../lib/supabase';
 import { PropertyListing } from '../types';
+import { enrichPropertyListing } from '../utils/propertyIntelligence';
+import { deterministicLocationResolver } from '../domain/location/locationResolver';
 
 export const propertyService = {
   // Create listing placeholder record to generate ID from database
   async createListingPlaceholder(
     listing: Omit<PropertyListing, 'id' | 'createdAt'>
   ): Promise<string> {
+    const resolvedCoords = await deterministicLocationResolver.resolveAddress(
+      listing.address,
+      listing.locality || '',
+      listing.city
+    );
+
     const { data, error } = await supabase
       .from('properties')
       .insert({
@@ -24,6 +32,24 @@ export const propertyService = {
         status: listing.status || 'published',
         property_type: listing.propertyType,
         locality: listing.locality,
+        carpet_area: listing.carpetArea || null,
+        built_up_area: listing.builtUpArea || null,
+        super_built_up_area: listing.superBuiltUpArea || null,
+        plot_area: listing.plotArea || null,
+        property_age: listing.propertyAge || null,
+        possession_status: listing.possessionStatus || null,
+        ownership_type: listing.ownershipType || null,
+        security_deposit: listing.securityDeposit || null,
+        monthly_maintenance: listing.monthlyMaintenance || null,
+        brokerage: listing.brokerage || null,
+        lease_duration: listing.leaseDuration || null,
+        available_from: listing.availableFrom || null,
+        preferred_tenant: listing.preferredTenant || null,
+        latitude: resolvedCoords.latitude,
+        longitude: resolvedCoords.longitude,
+        state: listing.state || null,
+        postal_code: listing.postalCode || null,
+        formatted_address: listing.formattedAddress || `${listing.address}, ${listing.locality || ''}, ${listing.city}`.replace(/,\s*,/g, ','),
       })
       .select('id')
       .single();
@@ -130,7 +156,7 @@ export const propertyService = {
     const propertyId = await this.createListingPlaceholder(listing);
     await this.updateListingUrls(propertyId, imageUrls, videoUrl, generatedThumbnailUrl);
     
-    return {
+    return enrichPropertyListing({
       id: propertyId,
       ownerId: listing.ownerId,
       title: listing.title,
@@ -149,7 +175,20 @@ export const propertyService = {
       amenities: listing.amenities,
       propertyType: listing.propertyType,
       locality: listing.locality,
-    };
+      carpetArea: listing.carpetArea,
+      builtUpArea: listing.builtUpArea,
+      superBuiltUpArea: listing.superBuiltUpArea,
+      plotArea: listing.plotArea,
+      propertyAge: listing.propertyAge,
+      possessionStatus: listing.possessionStatus,
+      ownershipType: listing.ownershipType,
+      securityDeposit: listing.securityDeposit,
+      monthlyMaintenance: listing.monthlyMaintenance,
+      brokerage: listing.brokerage,
+      leaseDuration: listing.leaseDuration,
+      availableFrom: listing.availableFrom,
+      preferredTenant: listing.preferredTenant,
+    });
   },
 
   async updateListing(
@@ -160,6 +199,12 @@ export const propertyService = {
     generatedThumbnailUrl?: string
   ): Promise<PropertyListing> {
     // 1. Update core details
+    const resolvedCoords = await deterministicLocationResolver.resolveAddress(
+      updates.address,
+      updates.locality || '',
+      updates.city
+    );
+
     const { data: propData, error: propError } = await supabase
       .from('properties')
       .update({
@@ -176,6 +221,24 @@ export const propertyService = {
         status: updates.status || 'published',
         property_type: updates.propertyType,
         locality: updates.locality,
+        carpet_area: updates.carpetArea || null,
+        built_up_area: updates.builtUpArea || null,
+        super_built_up_area: updates.superBuiltUpArea || null,
+        plot_area: updates.plotArea || null,
+        property_age: updates.propertyAge || null,
+        possession_status: updates.possessionStatus || null,
+        ownership_type: updates.ownershipType || null,
+        security_deposit: updates.securityDeposit || null,
+        monthly_maintenance: updates.monthlyMaintenance || null,
+        brokerage: updates.brokerage || null,
+        lease_duration: updates.leaseDuration || null,
+        available_from: updates.availableFrom || null,
+        preferred_tenant: updates.preferredTenant || null,
+        latitude: resolvedCoords.latitude,
+        longitude: resolvedCoords.longitude,
+        state: updates.state || null,
+        postal_code: updates.postalCode || null,
+        formatted_address: updates.formattedAddress || `${updates.address}, ${updates.locality || ''}, ${updates.city}`.replace(/,\s*,/g, ','),
       })
       .eq('id', id)
       .select()
@@ -226,7 +289,7 @@ export const propertyService = {
       if (videoError) throw videoError;
     }
 
-    return {
+    return enrichPropertyListing({
       id: propData.id,
       ownerId: propData.owner_id,
       title: propData.title,
@@ -246,7 +309,25 @@ export const propertyService = {
       amenities: propData.amenities,
       propertyType: propData.property_type,
       locality: propData.locality,
-    };
+      carpetArea: propData.carpet_area ? Number(propData.carpet_area) : undefined,
+      builtUpArea: propData.built_up_area ? Number(propData.built_up_area) : undefined,
+      superBuiltUpArea: propData.super_built_up_area ? Number(propData.super_built_up_area) : undefined,
+      plotArea: propData.plot_area ? Number(propData.plot_area) : undefined,
+      propertyAge: propData.property_age ? Number(propData.property_age) : undefined,
+      possessionStatus: propData.possession_status || undefined,
+      ownershipType: propData.ownership_type || undefined,
+      securityDeposit: propData.security_deposit ? Number(propData.security_deposit) : undefined,
+      monthlyMaintenance: propData.monthly_maintenance ? Number(propData.monthly_maintenance) : undefined,
+      brokerage: propData.brokerage ? Number(propData.brokerage) : undefined,
+      leaseDuration: propData.lease_duration ? Number(propData.lease_duration) : undefined,
+      availableFrom: propData.available_from || undefined,
+      preferredTenant: propData.preferred_tenant || undefined,
+      latitude: propData.latitude ? Number(propData.latitude) : undefined,
+      longitude: propData.longitude ? Number(propData.longitude) : undefined,
+      state: propData.state || undefined,
+      postalCode: propData.postal_code || undefined,
+      formattedAddress: propData.formatted_address || undefined,
+    });
   },
 
   async getOwnerListings(ownerId: string): Promise<PropertyListing[]> {
@@ -262,7 +343,7 @@ export const propertyService = {
 
     return data.map((item: any) => {
       const videoRecord = item.property_videos && item.property_videos[0];
-      return {
+      return enrichPropertyListing({
         id: item.id,
         ownerId: item.owner_id,
         title: item.title,
@@ -285,7 +366,25 @@ export const propertyService = {
         contactCount: item.contact_count || 0,
         propertyType: item.property_type,
         locality: item.locality,
-      };
+        carpetArea: item.carpet_area ? Number(item.carpet_area) : undefined,
+        builtUpArea: item.built_up_area ? Number(item.built_up_area) : undefined,
+        superBuiltUpArea: item.super_built_up_area ? Number(item.super_built_up_area) : undefined,
+        plotArea: item.plot_area ? Number(item.plot_area) : undefined,
+        propertyAge: item.property_age ? Number(item.property_age) : undefined,
+        possessionStatus: item.possession_status || undefined,
+        ownershipType: item.ownership_type || undefined,
+        securityDeposit: item.security_deposit ? Number(item.security_deposit) : undefined,
+        monthlyMaintenance: item.monthly_maintenance ? Number(item.monthly_maintenance) : undefined,
+        brokerage: item.brokerage ? Number(item.brokerage) : undefined,
+        leaseDuration: item.lease_duration ? Number(item.lease_duration) : undefined,
+        availableFrom: item.available_from || undefined,
+        preferredTenant: item.preferred_tenant || undefined,
+        latitude: item.latitude ? Number(item.latitude) : undefined,
+        longitude: item.longitude ? Number(item.longitude) : undefined,
+        state: item.state || undefined,
+        postalCode: item.postal_code || undefined,
+        formattedAddress: item.formatted_address || undefined,
+      });
     });
   },
 

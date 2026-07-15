@@ -14,6 +14,7 @@ import { Image } from 'expo-image';
 import { propertyUploadService, VideoAsset } from '../../services/propertyUploadService';
 import { useFeedback } from '../../context/FeedbackContext';
 import { profileService } from '../../services/profileService';
+import { AMENITIES, AMENITY_CATEGORIES } from '../../constants/property';
 
 export default function OwnerUploadScreen() {
   const router = useRouter();
@@ -77,6 +78,28 @@ export default function OwnerUploadScreen() {
   const [description, setDescription] = useState('');
   const [locality, setLocality] = useState('');
   const [contactPhone, setContactPhone] = useState('');
+  const [listingType, setListingType] = useState<'rent' | 'buy'>('rent');
+  const [status, setStatus] = useState<string>('available');
+
+  // Sale Fields
+  const [carpetArea, setCarpetArea] = useState('');
+  const [builtUpArea, setBuiltUpArea] = useState('');
+  const [superBuiltUpArea, setSuperBuiltUpArea] = useState('');
+  const [plotArea, setPlotArea] = useState('');
+  const [propertyAge, setPropertyAge] = useState('');
+  const [possessionStatus, setPossessionStatus] = useState<'ready-to-move' | 'under-construction'>('ready-to-move');
+  const [ownershipType, setOwnershipType] = useState<'freehold' | 'leasehold' | 'co-operative' | 'power-of-attorney'>('freehold');
+
+  // Rent Fields
+  const [securityDeposit, setSecurityDeposit] = useState('');
+  const [monthlyMaintenance, setMonthlyMaintenance] = useState('');
+  const [brokerage, setBrokerage] = useState('');
+  const [leaseDuration, setLeaseDuration] = useState('');
+  const [availableFrom, setAvailableFrom] = useState('Immediate');
+  const [preferredTenant, setPreferredTenant] = useState<'anyone' | 'family' | 'bachelors' | 'company'>('anyone');
+
+  // Amenities
+  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
@@ -98,6 +121,27 @@ export default function OwnerUploadScreen() {
         setSelectedVideo(property.videoUrl || null);
         setDescription(property.description || '');
         setLocality(property.locality || '');
+        setListingType(property.listingType);
+        setStatus(property.status || 'available');
+        
+        // Sale fields
+        setCarpetArea(property.carpetArea ? String(property.carpetArea) : '');
+        setBuiltUpArea(property.builtUpArea ? String(property.builtUpArea) : '');
+        setSuperBuiltUpArea(property.superBuiltUpArea ? String(property.superBuiltUpArea) : '');
+        setPlotArea(property.plotArea ? String(property.plotArea) : '');
+        setPropertyAge(property.propertyAge ? String(property.propertyAge) : '');
+        setPossessionStatus(property.possessionStatus || 'ready-to-move');
+        setOwnershipType(property.ownershipType || 'freehold');
+
+        // Rent fields
+        setSecurityDeposit(property.securityDeposit ? String(property.securityDeposit) : '');
+        setMonthlyMaintenance(property.monthlyMaintenance ? String(property.monthlyMaintenance) : '');
+        setBrokerage(property.brokerage ? String(property.brokerage) : '');
+        setLeaseDuration(property.leaseDuration ? String(property.leaseDuration) : '');
+        setAvailableFrom(property.availableFrom || 'Immediate');
+        setPreferredTenant(property.preferredTenant || 'anyone');
+
+        setSelectedAmenities(property.amenities || []);
 
         const loadOwnerPhone = async () => {
           try {
@@ -225,13 +269,30 @@ export default function OwnerUploadScreen() {
         bedrooms: parseInt(bhk) || 1,
         bathrooms: Math.max(1, (parseInt(bhk) || 1) - 1),
         furnishing: furnishing as any,
-        listingType: 'rent' as const,
+        listingType: listingType,
         propertyType,
         videoUrl: selectedVideo || '',
         thumbnailUrl: selectedImages[0],
-        status: (id ? properties.find((p) => p.id === id)?.status : 'published') as any,
-        amenities: ['Reserved Parking', 'Water Supply', '24x7 Security'],
+        status: status as any,
+        amenities: selectedAmenities,
         locality: locality || address.split(',')[0] || '',
+        
+        // Sale Columns
+        carpetArea: carpetArea ? parseFloat(carpetArea) : undefined,
+        builtUpArea: builtUpArea ? parseFloat(builtUpArea) : undefined,
+        superBuiltUpArea: superBuiltUpArea ? parseFloat(superBuiltUpArea) : undefined,
+        plotArea: plotArea ? parseFloat(plotArea) : undefined,
+        propertyAge: propertyAge ? parseInt(propertyAge) : undefined,
+        possessionStatus: listingType === 'buy' ? possessionStatus : undefined,
+        ownershipType: listingType === 'buy' ? ownershipType : undefined,
+
+        // Rent Columns
+        securityDeposit: securityDeposit ? parseFloat(securityDeposit) : undefined,
+        monthlyMaintenance: monthlyMaintenance ? parseFloat(monthlyMaintenance) : undefined,
+        brokerage: brokerage ? parseFloat(brokerage) : undefined,
+        leaseDuration: leaseDuration ? parseInt(leaseDuration) : undefined,
+        availableFrom: listingType === 'rent' ? availableFrom : undefined,
+        preferredTenant: listingType === 'rent' ? preferredTenant : undefined,
       };
 
       if (id) {
@@ -313,6 +374,53 @@ export default function OwnerUploadScreen() {
           </View>
         )}
 
+        {/* Transaction Type */}
+        <View style={styles.pickerContainer}>
+          <Text style={styles.pickerLabel}>Transaction Type</Text>
+          <View style={styles.pillRow}>
+            {[
+              { id: 'rent', label: 'Rent' },
+              { id: 'buy', label: 'Sale' },
+            ].map((type) => {
+              const active = listingType === type.id;
+              return (
+                <TouchableOpacity
+                  key={type.id}
+                  style={[styles.pill, active && styles.pillActive]}
+                  onPress={() => setListingType(type.id as any)}
+                  disabled={publishing}
+                >
+                  <Text style={[styles.pillText, active && styles.pillTextActive]}>
+                    For {type.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Lifecycle Status Selection */}
+        <View style={styles.pickerContainer}>
+          <Text style={styles.pickerLabel}>Listing Lifecycle Status</Text>
+          <View style={styles.pillRow}>
+            {['available', 'reserved', 'sold', 'rented', 'coming-soon'].map((s) => {
+              const active = status === s;
+              return (
+                <TouchableOpacity
+                  key={s}
+                  style={[styles.pill, active && styles.pillActive]}
+                  onPress={() => setStatus(s)}
+                  disabled={publishing}
+                >
+                  <Text style={[styles.pillText, active && styles.pillTextActive]}>
+                    {s.replace('-', ' ')}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
         <Input
           label="Property Title"
           placeholder="e.g. Elegant 3 BHK Carter Road Apartment"
@@ -320,14 +428,189 @@ export default function OwnerUploadScreen() {
           onChangeText={setTitle}
           editable={!publishing}
         />
+        
         <Input
-          label="Monthly Rent (INR)"
+          label={listingType === 'rent' ? 'Monthly Rent (INR)' : 'Total Sale Price (INR)'}
           placeholder="e.g. 180000"
           keyboardType="numeric"
           value={price}
           onChangeText={setPrice}
           editable={!publishing}
         />
+
+        {/* Conditional Rental Fields */}
+        {listingType === 'rent' && (
+          <>
+            <View style={{ flexDirection: 'row', gap: Theme.spacing.md }}>
+              <Input
+                label="Security Deposit (INR)"
+                placeholder="e.g. 500000"
+                keyboardType="numeric"
+                value={securityDeposit}
+                onChangeText={setSecurityDeposit}
+                style={{ flex: 1 }}
+                editable={!publishing}
+              />
+              <Input
+                label="Maintenance / month"
+                placeholder="e.g. 5000"
+                keyboardType="numeric"
+                value={monthlyMaintenance}
+                onChangeText={setMonthlyMaintenance}
+                style={{ flex: 1 }}
+                editable={!publishing}
+              />
+            </View>
+            <View style={{ flexDirection: 'row', gap: Theme.spacing.md }}>
+              <Input
+                label="Brokerage Charge (INR)"
+                placeholder="e.g. 0"
+                keyboardType="numeric"
+                value={brokerage}
+                onChangeText={setBrokerage}
+                style={{ flex: 1 }}
+                editable={!publishing}
+              />
+              <Input
+                label="Lease Duration (Months)"
+                placeholder="e.g. 11"
+                keyboardType="numeric"
+                value={leaseDuration}
+                onChangeText={setLeaseDuration}
+                style={{ flex: 1 }}
+                editable={!publishing}
+              />
+            </View>
+            <View style={{ flexDirection: 'row', gap: Theme.spacing.md }}>
+              <Input
+                label="Available From"
+                placeholder="e.g. Immediate"
+                value={availableFrom}
+                onChangeText={setAvailableFrom}
+                style={{ flex: 1 }}
+                editable={!publishing}
+              />
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text style={styles.pickerLabel}>Preferred Tenant</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                  {['anyone', 'family', 'bachelors'].map((tenant) => {
+                    const active = preferredTenant === tenant;
+                    return (
+                      <TouchableOpacity
+                        key={tenant}
+                        style={[styles.pill, active && styles.pillActive, { paddingVertical: 6, paddingHorizontal: 10 }]}
+                        onPress={() => setPreferredTenant(tenant as any)}
+                        disabled={publishing}
+                      >
+                        <Text style={[styles.pillText, { fontSize: 11 }, active && styles.pillTextActive]}>
+                          {tenant}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+          </>
+        )}
+
+        {/* Conditional Sale/Buy Fields */}
+        {listingType === 'buy' && (
+          <>
+            <View style={{ flexDirection: 'row', gap: Theme.spacing.md }}>
+              <Input
+                label="Carpet Area (Sq.ft)"
+                placeholder="e.g. 1100"
+                keyboardType="numeric"
+                value={carpetArea}
+                onChangeText={setCarpetArea}
+                style={{ flex: 1 }}
+                editable={!publishing}
+              />
+              <Input
+                label="Built-up Area (Sq.ft)"
+                placeholder="e.g. 1300"
+                keyboardType="numeric"
+                value={builtUpArea}
+                onChangeText={setBuiltUpArea}
+                style={{ flex: 1 }}
+                editable={!publishing}
+              />
+            </View>
+            <View style={{ flexDirection: 'row', gap: Theme.spacing.md }}>
+              <Input
+                label="Super Built-up (Sq.ft)"
+                placeholder="e.g. 1500"
+                keyboardType="numeric"
+                value={superBuiltUpArea}
+                onChangeText={setSuperBuiltUpArea}
+                style={{ flex: 1 }}
+                editable={!publishing}
+              />
+              <Input
+                label="Plot Area (Sq.ft)"
+                placeholder="e.g. 0"
+                keyboardType="numeric"
+                value={plotArea}
+                onChangeText={setPlotArea}
+                style={{ flex: 1 }}
+                editable={!publishing}
+              />
+            </View>
+            <View style={{ flexDirection: 'row', gap: Theme.spacing.md }}>
+              <Input
+                label="Property Age (Years)"
+                placeholder="e.g. 2"
+                keyboardType="numeric"
+                value={propertyAge}
+                onChangeText={setPropertyAge}
+                style={{ flex: 1 }}
+                editable={!publishing}
+              />
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text style={styles.pickerLabel}>Possession Status</Text>
+                <View style={{ flexDirection: 'row', gap: 4 }}>
+                  {['ready-to-move', 'under-construction'].map((pos) => {
+                    const active = possessionStatus === pos;
+                    return (
+                      <TouchableOpacity
+                        key={pos}
+                        style={[styles.pill, active && styles.pillActive, { paddingVertical: 6, paddingHorizontal: 8 }]}
+                        onPress={() => setPossessionStatus(pos as any)}
+                        disabled={publishing}
+                      >
+                        <Text style={[styles.pillText, { fontSize: 10 }, active && styles.pillTextActive]}>
+                          {pos.replace('-', ' ')}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+            <View style={styles.pickerContainer}>
+              <Text style={styles.pickerLabel}>Ownership Type</Text>
+              <View style={styles.pillRow}>
+                {['freehold', 'leasehold', 'co-operative', 'power-of-attorney'].map((o) => {
+                  const active = ownershipType === o;
+                  return (
+                    <TouchableOpacity
+                      key={o}
+                      style={[styles.pill, active && styles.pillActive]}
+                      onPress={() => setOwnershipType(o as any)}
+                      disabled={publishing}
+                    >
+                      <Text style={[styles.pillText, active && styles.pillTextActive]}>
+                        {o.replace('-', ' ')}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          </>
+        )}
+
         <Input
           label="Property Address"
           placeholder="e.g. Carter Road, Bandra West"
@@ -415,6 +698,44 @@ export default function OwnerUploadScreen() {
               );
             })}
           </View>
+        </View>
+
+        {/* Structured Amenities Selection */}
+        <View style={styles.pickerContainer}>
+          <Text style={styles.pickerLabel}>Structured Amenities Selection</Text>
+          {Object.entries(AMENITY_CATEGORIES).map(([catId, catLabel]) => {
+            const categoryAmenities = AMENITIES.filter(a => a.category === catId);
+            return (
+              <View key={catId} style={{ marginTop: Theme.spacing.sm, gap: 4 }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: Theme.colors.textSecondary }}>
+                  {catLabel}
+                </Text>
+                <View style={styles.pillRow}>
+                  {categoryAmenities.map((amenity) => {
+                    const active = selectedAmenities.includes(amenity.id);
+                    return (
+                      <TouchableOpacity
+                        key={amenity.id}
+                        style={[styles.pill, active && styles.pillActive]}
+                        onPress={() => {
+                          setSelectedAmenities(prev =>
+                            prev.includes(amenity.id)
+                              ? prev.filter(id => id !== amenity.id)
+                              : [...prev, amenity.id]
+                          );
+                        }}
+                        disabled={publishing}
+                      >
+                        <Text style={[styles.pillText, active && styles.pillTextActive]}>
+                          {amenity.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            );
+          })}
         </View>
 
         <Button variant="primary" style={styles.publishBtn} onPress={handlePublish} disabled={publishing}>

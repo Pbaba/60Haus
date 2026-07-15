@@ -19,6 +19,8 @@ import { Theme } from '../../theme';
 import { formatCurrency } from '../../utils';
 import { ArrowLeft, PlusCircle, Eye, Heart, Phone, Trash2 } from 'lucide-react-native';
 import { PropertyListing } from '../../types';
+import { localityIntelligence } from '../../domain/location/localityIntelligence';
+import { marketInsights } from '../../domain/location/marketInsights';
 
 export default function OwnerDashboardScreen() {
   const router = useRouter();
@@ -143,7 +145,10 @@ export default function OwnerDashboardScreen() {
           />
           <View style={styles.listingInfo}>
             <View style={styles.statusRow}>
-              <Text style={styles.listingPrice}>{formatCurrency(item.price)}</Text>
+              <Text style={styles.listingPrice}>
+                {formatCurrency(item.price)}
+                {item.listingType === 'rent' && <Text style={{ fontSize: 10, color: Theme.colors.textSecondary }}>/mo</Text>}
+              </Text>
               <View
                 style={[
                   styles.badge,
@@ -166,7 +171,7 @@ export default function OwnerDashboardScreen() {
             <Text style={styles.listingTitle} numberOfLines={1}>
               {item.title}
             </Text>
-            <Text style={styles.listingCity}>{item.city}</Text>
+            <Text style={styles.listingCity}>{item.locality ? `${item.locality}, ${item.city}` : item.city}</Text>
             
             <View style={styles.analyticsRow}>
               <View style={styles.statMini}>
@@ -183,6 +188,81 @@ export default function OwnerDashboardScreen() {
               </View>
             </View>
           </View>
+        </View>
+
+        {/* Marketplace Positioning Insights */}
+        {(() => {
+          const allItems = stats?.listings || [];
+          const metrics = item.locality 
+            ? localityIntelligence.calculateLocalityMetrics(allItems, item.locality)
+            : null;
+          const insights = metrics 
+            ? marketInsights.calculateMarketInsights(item, metrics, allItems)
+            : null;
+
+          if (!insights) return null;
+          return (
+            <View style={styles.positioningContainer}>
+              <Text style={styles.positioningTitle}>Locality Market Positioning</Text>
+              <View style={styles.positioningGrid}>
+                <View style={styles.posCell}>
+                  <Text style={styles.posLabel}>Pricing vs Locality</Text>
+                  <Text style={[
+                    styles.posValue,
+                    insights.priceVsLocalityAveragePct <= 0 ? { color: Theme.colors.success } : { color: Theme.colors.danger }
+                  ]}>
+                    {insights.priceVsLocalityAveragePct <= 0 
+                      ? `${Math.abs(insights.priceVsLocalityAveragePct)}% below` 
+                      : `${insights.priceVsLocalityAveragePct}% above`}
+                  </Text>
+                </View>
+                <View style={styles.posCell}>
+                  <Text style={styles.posLabel}>Size vs Area Avg</Text>
+                  <Text style={styles.posValue}>
+                    {insights.sizeVsLocalityAveragePct >= 0 
+                      ? `${insights.sizeVsLocalityAveragePct}% larger` 
+                      : `${Math.abs(insights.sizeVsLocalityAveragePct)}% smaller`}
+                  </Text>
+                </View>
+                <View style={styles.posCell}>
+                  <Text style={styles.posLabel}>Listing Rank</Text>
+                  <Text style={[styles.posValue, { color: Theme.colors.primary }]}>
+                    Top {insights.qualityPercentile}%
+                  </Text>
+                </View>
+              </View>
+            </View>
+          );
+        })()}
+
+        {/* Listing Health Scorecard & Suggestions */}
+        <View style={styles.healthContainer}>
+          <View style={styles.healthHeader}>
+            <Text style={styles.healthLabel}>Listing Quality Health</Text>
+            <Text style={[
+              styles.healthScoreValue,
+              (item.healthScore || 0) > 80 ? styles.healthGood : (item.healthScore || 0) > 50 ? styles.healthMedium : styles.healthPoor
+            ]}>
+              {item.healthScore || 0}%
+            </Text>
+          </View>
+          <View style={styles.healthBarBg}>
+            <View style={[
+              styles.healthBarFill,
+              { width: `${item.healthScore || 0}%` },
+              (item.healthScore || 0) > 80 ? { backgroundColor: Theme.colors.success } : (item.healthScore || 0) > 50 ? { backgroundColor: '#DD6B20' } : { backgroundColor: Theme.colors.danger }
+            ]} />
+          </View>
+          {item.healthSuggestions && item.healthSuggestions.length > 0 && (
+            <View style={styles.suggestionsList}>
+              <Text style={styles.suggestionsTitle}>Improvement suggestions:</Text>
+              {item.healthSuggestions.slice(0, 2).map((sug, idx) => (
+                <Text key={idx} style={styles.suggestionItem}>
+                  • {sug.text} <Text style={styles.boostText}>(+{sug.boost}% views)</Text>
+                </Text>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Action Controls */}
@@ -606,5 +686,106 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
+  },
+  healthContainer: {
+    padding: Theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Theme.colors.border,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    marginVertical: Theme.spacing.xs,
+    gap: 4,
+    borderRadius: Theme.borderRadius.sm,
+  },
+  healthHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  healthLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  healthScoreValue: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    fontFamily: Theme.typography.fontFamily,
+  },
+  healthGood: {
+    color: Theme.colors.success,
+  },
+  healthMedium: {
+    color: '#DFB978',
+  },
+  healthPoor: {
+    color: Theme.colors.danger,
+  },
+  healthBarBg: {
+    height: 6,
+    backgroundColor: Theme.colors.border,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginVertical: 4,
+  },
+  healthBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  suggestionsList: {
+    marginTop: 4,
+    gap: 2,
+  },
+  suggestionsTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Theme.colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.2,
+  },
+  suggestionItem: {
+    fontSize: 11,
+    color: Theme.colors.textPrimary,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  boostText: {
+    color: Theme.colors.primary,
+    fontWeight: 'bold',
+  },
+  positioningContainer: {
+    padding: Theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Theme.colors.border,
+    backgroundColor: 'rgba(255, 255, 255, 0.01)',
+    gap: 4,
+    borderRadius: Theme.borderRadius.sm,
+  },
+  positioningTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Theme.colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.2,
+  },
+  positioningGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  posCell: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  posLabel: {
+    fontSize: 9,
+    color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  posValue: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    fontFamily: Theme.typography.fontFamily,
+    marginTop: 2,
+    color: Theme.colors.textPrimary,
   },
 });

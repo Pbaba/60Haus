@@ -27,7 +27,7 @@ export interface PropertyListing {
   videoUrl: string;
   thumbnailUrl?: string;
   createdAt: string;
-  status?: 'draft' | 'published' | 'rented' | 'sold' | 'archived';
+  status?: 'draft' | 'published' | 'archived' | 'available' | 'reserved' | 'sold' | 'rented' | 'coming-soon';
   imageUrls?: string[];
   amenities?: string[];
   latitude?: number;
@@ -40,6 +40,37 @@ export interface PropertyListing {
   propertyType?: string;
   personalizationExplanations?: string[];
   trustSignals?: string[];
+  is_sponsored?: boolean;
+  priority_score?: number;
+  state?: string;
+  postalCode?: string;
+  formattedAddress?: string;
+
+  // Sale specific columns
+  carpetArea?: number;
+  builtUpArea?: number;
+  superBuiltUpArea?: number;
+  plotArea?: number;
+  propertyAge?: number;
+  possessionStatus?: 'ready-to-move' | 'under-construction';
+  ownershipType?: 'freehold' | 'leasehold' | 'co-operative' | 'power-of-attorney';
+
+  // Rent specific columns
+  securityDeposit?: number;
+  monthlyMaintenance?: number;
+  brokerage?: number;
+  leaseDuration?: number;
+  availableFrom?: string;
+  preferredTenant?: 'anyone' | 'family' | 'bachelors' | 'company';
+
+  // Dynamically computed metrics
+  pricePerSqft?: number;
+  pricePerSqm?: number;
+  priceTier?: 'budget' | 'mid-range' | 'premium' | 'luxury';
+  areaTier?: 'compact' | 'medium' | 'spacious' | 'villa';
+  luxuryClassification?: 'standard' | 'luxury' | 'ultra-luxury';
+  healthScore?: number;
+  healthSuggestions?: { text: string; boost: number }[];
 }
 
 export enum DiscoveryMode {

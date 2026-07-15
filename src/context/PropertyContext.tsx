@@ -8,6 +8,7 @@ import { discoveryService } from '../services/discoveryService';
 import { propertyUploadService, VideoAsset } from '../services/propertyUploadService';
 import { bookmarkService } from '../services/bookmarkService';
 import { historyService } from '../services/historyService';
+import { enrichPropertyListing } from '../utils/propertyIntelligence';
 import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../hooks/useProfile';
 import { useFeedback } from './FeedbackContext';
@@ -364,7 +365,7 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         finalThumb
       );
 
-      const newProperty: PropertyListing = {
+      const newProperty = enrichPropertyListing({
         id: propertyId,
         ownerId: newListing.ownerId,
         title: newListing.title,
@@ -384,7 +385,23 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         viewCount: 0,
         saveCount: 0,
         contactCount: 0,
-      };
+        propertyType: newListing.propertyType,
+        locality: newListing.locality,
+        carpetArea: newListing.carpetArea,
+        builtUpArea: newListing.builtUpArea,
+        superBuiltUpArea: newListing.superBuiltUpArea,
+        plotArea: newListing.plotArea,
+        propertyAge: newListing.propertyAge,
+        possessionStatus: newListing.possessionStatus,
+        ownershipType: newListing.ownershipType,
+        securityDeposit: newListing.securityDeposit,
+        monthlyMaintenance: newListing.monthlyMaintenance,
+        brokerage: newListing.brokerage,
+        leaseDuration: newListing.leaseDuration,
+        availableFrom: newListing.availableFrom,
+        preferredTenant: newListing.preferredTenant,
+        status: newListing.status || 'published',
+      });
 
       feedCache = {};
       setProperties((prev) => [newProperty, ...prev]);
