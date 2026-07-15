@@ -6,6 +6,7 @@ import { bookmarkService } from './bookmarkService';
 import { historyService } from './historyService';
 
 import { personalizationService } from './personalizationService';
+import { enrichPropertyListing } from '../utils/propertyIntelligence';
 
 export interface DiscoveryStrategyInput {
   filters?: SearchFilters;
@@ -313,7 +314,7 @@ export const discoveryService = {
 
       const mappedCandidates: PropertyListing[] = data.map((item: any) => {
         const videoRecord = item.property_videos && item.property_videos[0];
-        return {
+        return enrichPropertyListing({
           id: item.id,
           ownerId: item.owner_id,
           title: item.title,
@@ -334,7 +335,21 @@ export const discoveryService = {
           viewCount: item.view_count || 0,
           is_sponsored: item.is_sponsored,
           priority_score: item.priority_score,
-        } as any;
+          carpetArea: item.carpet_area ? Number(item.carpet_area) : undefined,
+          builtUpArea: item.built_up_area ? Number(item.built_up_area) : undefined,
+          superBuiltUpArea: item.super_built_up_area ? Number(item.super_built_up_area) : undefined,
+          plotArea: item.plot_area ? Number(item.plot_area) : undefined,
+          propertyAge: item.property_age ? Number(item.property_age) : undefined,
+          possessionStatus: item.possession_status || undefined,
+          ownershipType: item.ownership_type || undefined,
+          securityDeposit: item.security_deposit ? Number(item.security_deposit) : undefined,
+          monthlyMaintenance: item.monthly_maintenance ? Number(item.monthly_maintenance) : undefined,
+          brokerage: item.brokerage ? Number(item.brokerage) : undefined,
+          leaseDuration: item.lease_duration ? Number(item.lease_duration) : undefined,
+          availableFrom: item.available_from || undefined,
+          preferredTenant: item.preferred_tenant || undefined,
+          status: item.status,
+        });
       });
 
       const scored = mappedCandidates.map((candidate) => {

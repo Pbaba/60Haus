@@ -1,4 +1,6 @@
 import { PropertyListing } from '../types';
+import { DISCOVERY_WEIGHTS } from '../constants/property';
+import { enrichPropertyListing } from '../utils/propertyIntelligence';
 
 export const personalizationService = {
   // Score a listing based on user profile preferences, saves, and recent history
@@ -57,7 +59,24 @@ export const personalizationService = {
       const affinity = localityCounts[itemLoc] || 0;
       if (affinity > 0) {
         score += Math.min(3.0, affinity * 0.5);
-        explanations.push('Same locality');
+        explanations.push('In your preferred locality');
+      }
+    }
+
+    // 3. Size / Configuration matching (BHK preference from recent history)
+    if (recentlyViewedProperties.length > 0) {
+      const bhkCounts: Record<number, number> = {};
+      recentlyViewedProperties.forEach((p) => {
+        bhkCounts[p.bedrooms] = (bhkCounts[p.bedrooms] || 0) + 1;
+      });
+      const favoriteBhk = Object.keys(bhkCounts).reduce((a, b) => 
+        bhkCounts[Number(a)] > bhkCounts[Number(b)] ? Number(a) : Number(b), 
+        item.bedrooms
+      );
+      
+      if (item.bedrooms === favoriteBhk) {
+        score += 1.0;
+        explanations.push(`Matches your typical BHK search (${item.bedrooms} BHK)`);
       }
     }
 
@@ -155,23 +174,42 @@ export const personalizationService = {
       }
     });
 
-    const scoredListings = candidateListings.map((item) => {
-      const { score, explanations, trustSignals } = this.computeListingScore(
+    const scoredListings = candidateListings.map((rawItem) => {
+      // Safely ensure item has computed intelligence, trust, and health metrics
+      const item = rawItem.healthScore === undefined ? enrichPropertyListing(rawItem) : rawItem;
+
+      const { score, explanations } = this.computeListingScore(
         item,
         userProfile,
         savedProperties,
         recentlyViewedProperties,
         localityCounts
       );
+
+      // Compute composite ranking components normalized to 0.0 - 1.0
+      const normPersonalization = Math.min(1.0, score / 10.0);
+      const normHealth = (item.healthScore || 0) / 100.0;
+      const normTrust = (item.trustSignals?.length || 0) / 7.0; // 7 possible trust badges
+      
+      const ageInDays = Math.max(0, (Date.now() - new Date(item.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+      const freshness = 1.0 / (1.0 + ageInDays);
+
+      const compositeScore = (
+        normPersonalization * DISCOVERY_WEIGHTS.personalization +
+        normHealth * DISCOVERY_WEIGHTS.health +
+        normTrust * DISCOVERY_WEIGHTS.trust +
+        freshness * DISCOVERY_WEIGHTS.freshness
+      );
       
       return {
         ...item,
         personalizationExplanations: explanations,
-        trustSignals: trustSignals,
         personalizationScore: score,
+        priority_score: compositeScore, // Assign composite discovery ranking score
       };
     });
 
-    return (scoredListings as any[]).sort((a, b) => b.personalizationScore - a.personalizationScore);
+    // Sort by final calculated composite ranking score (descending)
+    return (scoredListings as any[]).sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0));
   },
 };
