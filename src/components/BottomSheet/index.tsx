@@ -108,12 +108,12 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     <View style={StyleSheet.absoluteFill}>
       {/* Backdrop */}
       <Animated.View style={[styles.backdrop, backdropStyle]}>
-        <Pressable style={styles.backdropPressable} onPress={() => snapTo(SNAP_POINTS.CLOSED)} />
+        <Pressable style={styles.backdropPressable} onPress={() => snapTo(SNAP_POINTS.CLOSED)} accessibilityRole="button" accessibilityLabel="Close sheet" />
       </Animated.View>
 
       {/* Sheet Body Container */}
       <GestureDetector gesture={panGesture}>
-        <Animated.View style={[styles.sheetContainer, animatedStyle]}>
+        <Animated.View style={[styles.sheetContainer, animatedStyle]} accessibilityViewIsModal={true} accessibilityLabel={title || 'Bottom sheet'}>
           <View style={styles.dragIndicator} />
           {title && <Text style={styles.sheetTitle}>{title}</Text>}
           <View style={styles.contentContainer}>{children}</View>
@@ -156,9 +156,8 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     fontSize: Theme.typography.sizes.lg,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
     marginBottom: Theme.spacing.md,
   },
   contentContainer: {

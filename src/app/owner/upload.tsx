@@ -792,9 +792,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: Theme.typography.sizes.h1,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
   },
   subtitle: {
     fontSize: Theme.typography.sizes.sm,
@@ -824,12 +823,11 @@ const styles = StyleSheet.create({
   },
   dropzoneTitle: {
     fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   dropzoneSub: {
-    fontSize: 10,
+    fontSize: Theme.typography.sizes.xs,
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
   },
@@ -880,9 +878,8 @@ const styles = StyleSheet.create({
   },
   pickerLabel: {
     fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.semiBold,
     color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilySemiBold,
   },
   pillRow: {
     flexDirection: 'row',
@@ -909,7 +906,7 @@ const styles = StyleSheet.create({
   },
   pillTextActive: {
     color: Theme.colors.primary,
-    fontWeight: Theme.typography.weights.bold,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   publishBtn: {
     marginTop: Theme.spacing.lg,
@@ -939,9 +936,8 @@ const styles = StyleSheet.create({
   },
   overlayTitle: {
     fontSize: Theme.typography.sizes.lg,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
     textAlign: 'center',
     marginTop: Theme.spacing.sm,
   },
@@ -979,8 +975,7 @@ const styles = StyleSheet.create({
     width: 35,
     fontSize: Theme.typography.sizes.xs,
     color: Theme.colors.textPrimary,
-    fontWeight: Theme.typography.weights.bold,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
     textAlign: 'right',
   },
 });

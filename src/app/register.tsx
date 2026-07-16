@@ -30,7 +30,7 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await signUp(email, password, name);
-      await showTransactionFeedback('success', 'Registration Successful', 'Welcome to 60house! Your account has been created successfully, and you are now signed in.');
+      await showTransactionFeedback('success', 'Registration Successful', 'Welcome to 60Haus! Your account has been created successfully, and you are now signed in.');
       router.replace('/(tabs)' as any);
     } catch (error: any) {
       showTransactionFeedback('error', 'Registration Failed', error.message || 'Registration failed. Please try again.');
@@ -47,7 +47,7 @@ export default function RegisterScreen() {
 
       <View style={styles.content}>
         <Text style={styles.title}>Create Account</Text>
-        <Text style={styles.subtitle}>Join 60house to discover properties immediately.</Text>
+        <Text style={styles.subtitle}>Join 60Haus to discover properties immediately.</Text>
 
         <View style={styles.form}>
           <Input
@@ -58,7 +58,7 @@ export default function RegisterScreen() {
           />
           <Input
             label="Email Address"
-            placeholder="e.g. alex@60house.com"
+            placeholder="e.g. alex@60haus.app"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -96,11 +96,10 @@ const styles = StyleSheet.create({
     paddingTop: Theme.spacing.xs,
   },
   title: {
-    fontSize: 32,
-    fontWeight: Theme.typography.weights.bold,
+    fontSize: Theme.typography.sizes.display,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
-    letterSpacing: -0.5,
+    fontFamily: Theme.typography.fontFamilyBold,
+    letterSpacing: Theme.typography.letterSpacing.tight,
   },
   subtitle: {
     fontSize: Theme.typography.sizes.md,
@@ -114,10 +113,9 @@ const styles = StyleSheet.create({
   },
   roleLabel: {
     fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.medium,
     color: Theme.colors.textSecondary,
     marginBottom: Theme.spacing.sm,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyMedium,
   },
   roleContainer: {
     flexDirection: 'row',
@@ -145,7 +143,7 @@ const styles = StyleSheet.create({
   },
   roleTextActive: {
     color: Theme.colors.primary,
-    fontWeight: Theme.typography.weights.medium,
+    fontFamily: Theme.typography.fontFamilyMedium,
   },
   btn: {
     marginTop: Theme.spacing.md,

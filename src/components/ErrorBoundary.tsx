@@ -81,16 +81,15 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: Theme.typography.sizes.h2,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   subtitle: {
     fontSize: Theme.typography.sizes.sm,
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: Theme.typography.lineHeights.lg,
     paddingHorizontal: Theme.spacing.md,
   },
   devBox: {
@@ -104,9 +103,9 @@ const styles = StyleSheet.create({
   },
   devTitle: {
     color: Theme.colors.danger,
-    fontWeight: '700',
+    fontFamily: Theme.typography.fontFamilyBold,
     marginBottom: 4,
-    fontSize: 12,
+    fontSize: Theme.typography.sizes.sm,
   },
   devText: {
     color: Theme.colors.textSecondary,

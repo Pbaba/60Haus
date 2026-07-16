@@ -505,9 +505,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: Theme.typography.sizes.md,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
     flex: 1,
   },
   addBtn: {
@@ -537,13 +536,12 @@ const styles = StyleSheet.create({
     borderColor: Theme.colors.border,
   },
   kpiVal: {
-    fontSize: 22,
-    fontWeight: Theme.typography.weights.bold,
+    fontSize: Theme.typography.sizes.h3,
     color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   kpiLabel: {
-    fontSize: 10,
+    fontSize: Theme.typography.sizes.xs,
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
     textTransform: 'uppercase',
@@ -572,7 +570,7 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: Theme.colors.primary,
-    fontWeight: Theme.typography.weights.bold,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   listingsList: {
     gap: Theme.spacing.md,
@@ -606,9 +604,8 @@ const styles = StyleSheet.create({
   },
   listingPrice: {
     fontSize: Theme.typography.sizes.md,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   badge: {
     backgroundColor: Theme.colors.primary + '15',
@@ -617,10 +614,9 @@ const styles = StyleSheet.create({
     borderRadius: Theme.borderRadius.xs,
   },
   badgeText: {
-    fontSize: 9,
-    fontWeight: Theme.typography.weights.bold,
+    fontSize: Theme.typography.sizes.xxs,
     color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
     textTransform: 'capitalize',
   },
   draftBadge: {
@@ -637,9 +633,8 @@ const styles = StyleSheet.create({
   },
   listingTitle: {
     fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.semiBold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
   },
   listingCity: {
     fontSize: Theme.typography.sizes.xs,
@@ -657,7 +652,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   statMiniText: {
-    fontSize: 10,
+    fontSize: Theme.typography.sizes.xs,
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
   },
@@ -702,15 +697,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   healthLabel: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: Theme.typography.sizes.sm,
     color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilySemiBold,
   },
   healthScoreValue: {
     fontSize: 13,
-    fontWeight: 'bold',
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   healthGood: {
     color: Theme.colors.success,
@@ -737,11 +730,11 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   suggestionsTitle: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: Theme.typography.sizes.xs,
     color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamilyBold,
     textTransform: 'uppercase',
-    letterSpacing: 0.2,
+    letterSpacing: Theme.typography.letterSpacing.wide,
   },
   suggestionItem: {
     fontSize: 11,
@@ -750,7 +743,7 @@ const styles = StyleSheet.create({
   },
   boostText: {
     color: Theme.colors.primary,
-    fontWeight: 'bold',
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   positioningContainer: {
     padding: Theme.spacing.md,
@@ -761,11 +754,11 @@ const styles = StyleSheet.create({
     borderRadius: Theme.borderRadius.sm,
   },
   positioningTitle: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: Theme.typography.sizes.xs,
     color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamilyBold,
     textTransform: 'uppercase',
-    letterSpacing: 0.2,
+    letterSpacing: Theme.typography.letterSpacing.wide,
   },
   positioningGrid: {
     flexDirection: 'row',
@@ -777,14 +770,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   posLabel: {
-    fontSize: 9,
+    fontSize: Theme.typography.sizes.xxs,
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
   },
   posValue: {
     fontSize: 11,
-    fontWeight: 'bold',
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
     marginTop: 2,
     color: Theme.colors.textPrimary,
   },

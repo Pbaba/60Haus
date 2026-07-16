@@ -46,7 +46,7 @@ export default function LoginScreen() {
         <View style={styles.form}>
           <Input
             label="Email Address"
-            placeholder="e.g. alex@60house.com"
+            placeholder="e.g. alex@60haus.app"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -84,11 +84,10 @@ const styles = StyleSheet.create({
     paddingTop: Theme.spacing.lg,
   },
   title: {
-    fontSize: 32,
-    fontWeight: Theme.typography.weights.bold,
+    fontSize: Theme.typography.sizes.display,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
-    letterSpacing: -0.5,
+    fontFamily: Theme.typography.fontFamilyBold,
+    letterSpacing: Theme.typography.letterSpacing.tight,
   },
   subtitle: {
     fontSize: Theme.typography.sizes.md,

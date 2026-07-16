@@ -53,6 +53,7 @@ export const Input: React.FC<InputProps> = ({
           style={[styles.input, inputStyle]}
           onFocus={handleFocus}
           onBlur={handleBlur}
+          accessibilityLabel={label || props.placeholder}
           {...props}
         />
       </View>
@@ -68,10 +69,9 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.medium,
     color: Theme.colors.textSecondary,
     marginBottom: Theme.spacing.xs,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyMedium,
   },
   inputWrapper: {
     width: '100%',

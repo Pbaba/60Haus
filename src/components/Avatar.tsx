@@ -46,7 +46,12 @@ export const Avatar: React.FC<AvatarProps> = ({
   }[size];
 
   return (
-    <View style={[styles.container, sizeStyle, style]}>
+    <View
+      style={[styles.container, sizeStyle, style]}
+      accessible={true}
+      accessibilityRole="image"
+      accessibilityLabel={`Avatar of ${name}`}
+    >
       {source ? (
         <Image
           source={{ uri: source }}
@@ -82,7 +87,6 @@ const styles = StyleSheet.create({
   },
   initials: {
     color: Theme.colors.primary,
-    fontWeight: Theme.typography.weights.bold,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
 });

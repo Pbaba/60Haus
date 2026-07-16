@@ -271,10 +271,9 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: Theme.typography.sizes.h2,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
-    letterSpacing: -0.5,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
+    letterSpacing: Theme.typography.letterSpacing.tight,
   },
   roleBadge: {
     borderWidth: 1,
@@ -286,9 +285,8 @@ const styles = StyleSheet.create({
   },
   roleText: {
     fontSize: Theme.typography.sizes.xs,
-    fontWeight: Theme.typography.weights.medium,
     color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyMedium,
     textTransform: 'uppercase',
   },
   bio: {
@@ -296,7 +294,7 @@ const styles = StyleSheet.create({
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: Theme.typography.lineHeights.lg,
     marginTop: Theme.spacing.xs,
     paddingHorizontal: Theme.spacing.md,
   },
@@ -311,9 +309,8 @@ const styles = StyleSheet.create({
   },
   statNum: {
     fontSize: Theme.typography.sizes.xl,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   statLabel: {
     fontSize: Theme.typography.sizes.xs,
@@ -356,9 +353,8 @@ const styles = StyleSheet.create({
   },
   ctaTitle: {
     fontSize: Theme.typography.sizes.md,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   ctaSub: {
     fontSize: Theme.typography.sizes.sm,
@@ -372,11 +368,10 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: Theme.typography.letterSpacing.wider,
     marginBottom: Theme.spacing.xs,
   },
   tabFilters: {
@@ -404,7 +399,7 @@ const styles = StyleSheet.create({
   },
   tabFilterTextActive: {
     color: Theme.colors.primary,
-    fontWeight: Theme.typography.weights.bold,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   listingsContainer: {
     gap: Theme.spacing.md,
@@ -436,15 +431,13 @@ const styles = StyleSheet.create({
   },
   listingPrice: {
     fontSize: Theme.typography.sizes.md,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   listingTitle: {
     fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.semiBold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
   },
   statusRow: {
     flexDirection: 'row',
@@ -459,16 +452,16 @@ const styles = StyleSheet.create({
   },
   publishedBadgeText: {
     color: Theme.colors.success,
-    fontSize: 10,
-    fontWeight: Theme.typography.weights.bold,
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   draftBadge: {
     backgroundColor: Theme.colors.textSecondary + '15',
   },
   draftBadgeText: {
     color: Theme.colors.textSecondary,
-    fontSize: 10,
-    fontWeight: Theme.typography.weights.bold,
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   deleteListingBtn: {
     padding: Theme.spacing.md,
@@ -520,16 +513,15 @@ const styles = StyleSheet.create({
   },
   guestTitle: {
     fontSize: Theme.typography.sizes.h2,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
   },
   guestSubtitle: {
     fontSize: Theme.typography.sizes.sm,
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: Theme.typography.lineHeights.lg,
     marginBottom: Theme.spacing.lg,
   },
   guestBtn: {
@@ -563,18 +555,16 @@ const styles = StyleSheet.create({
   },
   recentPrice: {
     fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   recentTitle: {
     fontSize: Theme.typography.sizes.xs,
-    fontWeight: Theme.typography.weights.semiBold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
   },
   recentLocation: {
-    fontSize: 10,
+    fontSize: Theme.typography.sizes.xs,
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
   },

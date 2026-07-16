@@ -6,6 +6,7 @@ import { Coordinate, NearbyPlace, MapProvider } from './interfaces';
 let MapView: any = null;
 let Marker: any = null;
 try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const MapModule = require('react-native-maps');
   MapView = MapModule.default;
   Marker = MapModule.Marker;

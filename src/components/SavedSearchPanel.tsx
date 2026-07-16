@@ -252,10 +252,10 @@ const styles = StyleSheet.create({
     marginBottom: Theme.spacing.sm,
   },
   title: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: Theme.typography.sizes.md,
+    fontFamily: Theme.typography.fontFamilySemiBold,
     color: '#FFF',
-    letterSpacing: 0.2,
+    letterSpacing: Theme.typography.letterSpacing.wide,
   },
   addBtn: {
     flexDirection: 'row',
@@ -269,8 +269,8 @@ const styles = StyleSheet.create({
   },
   addBtnText: {
     color: Theme.colors.primary,
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: Theme.typography.sizes.sm,
+    fontFamily: Theme.typography.fontFamilySemiBold,
     marginLeft: 4,
   },
   scrollContent: {
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(212, 163, 89, 0.05)',
   },
   profileIcon: {
-    fontSize: 18,
+    fontSize: Theme.typography.sizes.xl,
     marginRight: Theme.spacing.sm,
   },
   profileMeta: {
@@ -301,14 +301,14 @@ const styles = StyleSheet.create({
   },
   profileName: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: Theme.typography.fontFamilySemiBold,
     color: Theme.colors.textSecondary,
   },
   profileTextSelected: {
     color: Theme.colors.primary,
   },
   profileDesc: {
-    fontSize: 10,
+    fontSize: Theme.typography.sizes.xs,
     color: 'rgba(255,255,255,0.4)',
     marginTop: 2,
   },
@@ -337,13 +337,13 @@ const styles = StyleSheet.create({
     marginBottom: Theme.spacing.lg,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: Theme.typography.sizes.xl,
+    fontFamily: Theme.typography.fontFamilyBold,
     color: '#FFF',
   },
   label: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: Theme.typography.sizes.sm,
+    fontFamily: Theme.typography.fontFamilySemiBold,
     color: Theme.colors.textSecondary,
     marginBottom: Theme.spacing.xs,
     marginTop: Theme.spacing.md,
@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
     paddingHorizontal: Theme.spacing.md,
     paddingVertical: Theme.spacing.sm,
-    fontSize: 14,
+    fontSize: Theme.typography.sizes.md,
   },
   iconGrid: {
     flexDirection: 'row',
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(212, 163, 89, 0.1)',
   },
   iconPillText: {
-    fontSize: 20,
+    fontSize: Theme.typography.sizes.xxl,
   },
   saveBtn: {
     backgroundColor: Theme.colors.primary,
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
   },
   saveBtnText: {
     color: '#000',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: Theme.typography.sizes.md,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
 });

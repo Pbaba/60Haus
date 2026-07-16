@@ -118,7 +118,7 @@ export default function PropertyDetailScreen() {
     try {
       await Share.share({
         message: `Check out this amazing walkthrough: ${property.title} in ${property.city} for ${formatCurrency(property.price)}/mo!`,
-        url: `https://60house.com/property/${property.id}`,
+        url: `https://60haus.app/property/${property.id}`,
       });
     } catch (e) {
       console.warn('Share failed:', e);
@@ -419,9 +419,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: Theme.typography.sizes.md,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
     flex: 1,
   },
   headerActions: {
@@ -454,14 +453,13 @@ const styles = StyleSheet.create({
   },
   price: {
     fontSize: 26,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   perMonth: {
     fontSize: Theme.typography.sizes.sm,
     color: Theme.colors.textSecondary,
-    fontWeight: Theme.typography.weights.regular,
+    fontFamily: Theme.typography.fontFamily,
   },
   location: {
     fontSize: Theme.typography.sizes.md,
@@ -487,9 +485,8 @@ const styles = StyleSheet.create({
   },
   specValue: {
     fontSize: Theme.typography.sizes.md,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
     textTransform: 'capitalize',
   },
   specLabel: {
@@ -502,18 +499,17 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: Theme.typography.letterSpacing.wider,
     marginBottom: Theme.spacing.xs,
   },
   desc: {
     fontSize: Theme.typography.sizes.md,
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
-    lineHeight: 22,
+    lineHeight: Theme.typography.lineHeights.xl,
   },
   amenities: {
     flexDirection: 'row',
@@ -557,9 +553,8 @@ const styles = StyleSheet.create({
   },
   ownerName: {
     fontSize: Theme.typography.sizes.md,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   ownerTitle: {
     fontSize: Theme.typography.sizes.xs,
@@ -571,7 +566,7 @@ const styles = StyleSheet.create({
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
     marginTop: 4,
-    lineHeight: 16,
+    lineHeight: Theme.typography.lineHeights.sm,
   },
   relatedScroll: {
     gap: Theme.spacing.md,
@@ -594,18 +589,16 @@ const styles = StyleSheet.create({
   },
   relatedPrice: {
     fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   relatedTitle: {
     fontSize: Theme.typography.sizes.xs,
-    fontWeight: Theme.typography.weights.semiBold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
   },
   relatedCity: {
-    fontSize: 10,
+    fontSize: Theme.typography.sizes.xs,
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
   },

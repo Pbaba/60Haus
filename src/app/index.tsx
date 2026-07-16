@@ -41,7 +41,7 @@ export default function SplashScreen() {
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-        <Text style={styles.logo}>60house</Text>
+        <Text style={styles.logo}>60Haus</Text>
       </Animated.View>
     </View>
   );
@@ -58,10 +58,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logo: {
-    fontSize: 48,
-    fontWeight: Theme.typography.weights.black,
+    fontSize: Theme.typography.sizes.splash,
     color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamily,
-    letterSpacing: -1.5,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
+    letterSpacing: Theme.typography.letterSpacing.tighter,
   },
 });

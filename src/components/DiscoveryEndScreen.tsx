@@ -259,17 +259,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    fontSize: 24,
-    fontWeight: Theme.typography.weights.bold,
+    fontSize: Theme.typography.sizes.h2,
     color: '#FFFFFF',
     marginBottom: 8,
     textAlign: 'center',
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
   },
   subtitle: {
     fontSize: 13,
     color: 'rgba(255, 255, 255, 0.55)',
-    lineHeight: 18,
+    lineHeight: Theme.typography.lineHeights.md,
     textAlign: 'center',
     marginBottom: 32,
     paddingHorizontal: 16,
@@ -286,7 +285,7 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   supportMessage: {
-    fontSize: 12,
+    fontSize: Theme.typography.sizes.sm,
     color: 'rgba(255, 255, 255, 0.4)',
     marginTop: 24,
     fontStyle: 'italic',
@@ -310,8 +309,7 @@ const styles = StyleSheet.create({
   loaderText: {
     color: '#FFFFFF',
     marginTop: 16,
-    fontSize: 14,
-    fontWeight: Theme.typography.weights.semiBold,
-    fontFamily: Theme.typography.fontFamily,
+    fontSize: Theme.typography.sizes.md,
+    fontFamily: Theme.typography.fontFamilySemiBold,
   },
 });

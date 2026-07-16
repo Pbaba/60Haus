@@ -1,4 +1,4 @@
-import { Coordinate, NearbyPlace, CommuteEstimate, LocalityMetrics, NeighborhoodSnapshot } from './interfaces';
+import { Coordinate, NeighborhoodSnapshot } from './interfaces';
 import { locationCache } from './locationCache';
 import { deterministicLocationResolver } from './locationResolver';
 import { nearbyPlacesService } from './nearbyPlaces';
