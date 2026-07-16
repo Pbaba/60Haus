@@ -208,22 +208,20 @@ const styles = StyleSheet.create({
     gap: Theme.spacing.xs,
   },
   price: {
-    fontSize: 28,
-    fontWeight: Theme.typography.weights.bold,
+    fontSize: Theme.typography.sizes.h1,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   perMonth: {
     fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.regular,
     color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamily,
   },
   title: {
     fontSize: Theme.typography.sizes.xl,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
-    letterSpacing: -0.5,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
+    letterSpacing: Theme.typography.letterSpacing.tight,
   },
   location: {
     fontSize: Theme.typography.sizes.md,
@@ -295,11 +293,11 @@ const styles = StyleSheet.create({
   },
   trustSignalText: {
     color: Theme.colors.primary,
-    fontSize: 9,
-    fontWeight: '700',
+    fontSize: Theme.typography.sizes.xxs,
+    fontFamily: Theme.typography.fontFamilyBold,
     marginLeft: 3,
     textTransform: 'uppercase',
-    letterSpacing: 0.2,
+    letterSpacing: Theme.typography.letterSpacing.wide,
   },
   explanationsContainer: {
     flexDirection: 'row',
@@ -320,8 +318,8 @@ const styles = StyleSheet.create({
   },
   explanationTagText: {
     color: '#FFF',
-    fontSize: 10,
-    fontWeight: '600',
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilySemiBold,
     marginLeft: 3,
   },
 });

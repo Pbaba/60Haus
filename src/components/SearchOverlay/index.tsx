@@ -708,17 +708,15 @@ const styles = StyleSheet.create({
   },
   sectionHeaderTitle: {
     fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: Theme.typography.letterSpacing.wider,
   },
   subLabel: {
     fontSize: Theme.typography.sizes.sm,
     color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
-    fontWeight: '600',
+    fontFamily: Theme.typography.fontFamilySemiBold,
     marginBottom: 4,
   },
   chipContainer: {
@@ -745,7 +743,7 @@ const styles = StyleSheet.create({
   },
   activeChipText: {
     color: Theme.colors.primary,
-    fontWeight: Theme.typography.weights.bold,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   accordionContainer: {
     borderBottomWidth: 1,
@@ -767,9 +765,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: Theme.typography.sizes.md,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   sectionResetBtn: {
     paddingVertical: 4,
@@ -778,7 +775,7 @@ const styles = StyleSheet.create({
   sectionResetText: {
     fontSize: Theme.typography.sizes.sm,
     color: Theme.colors.primary,
-    fontWeight: '600',
+    fontFamily: Theme.typography.fontFamilySemiBold,
   },
   accordionBody: {
     paddingTop: Theme.spacing.md,
@@ -795,9 +792,8 @@ const styles = StyleSheet.create({
   },
   amenityCategoryTitle: {
     fontSize: Theme.typography.sizes.sm - 1,
-    fontWeight: '600',
     color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilySemiBold,
   },
   footer: {
     flexDirection: 'row',

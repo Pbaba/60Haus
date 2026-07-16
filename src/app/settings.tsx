@@ -219,9 +219,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: Theme.typography.sizes.h1,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   subtitle: {
     fontSize: Theme.typography.sizes.sm,
@@ -270,9 +269,8 @@ const styles = StyleSheet.create({
   },
   guestNoticeTitle: {
     fontSize: Theme.typography.sizes.lg,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   guestNoticeSub: {
     fontSize: Theme.typography.sizes.sm,
@@ -319,22 +317,20 @@ const styles = StyleSheet.create({
   // Personalization settings styles
   sectionTitle: {
     fontSize: Theme.typography.sizes.md,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textSecondary,
     marginTop: Theme.spacing.md,
     marginBottom: Theme.spacing.xs,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: Theme.typography.letterSpacing.wider,
   },
   pickerContainer: {
     marginBottom: Theme.spacing.md,
   },
   pickerLabel: {
     fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.semiBold,
     color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilySemiBold,
     marginBottom: Theme.spacing.xs,
   },
   pillRow: {
@@ -361,6 +357,6 @@ const styles = StyleSheet.create({
   },
   pillTextActive: {
     color: Theme.colors.primary,
-    fontWeight: Theme.typography.weights.bold,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
 });

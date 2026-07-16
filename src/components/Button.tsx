@@ -48,6 +48,8 @@ export const Button: React.FC<ButtonProps> = ({
       activeOpacity={0.8}
       disabled={disabled || loading}
       style={buttonStyles}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
       {...props}
     >
       {loading ? (
@@ -85,8 +87,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   baseText: {
-    fontFamily: Theme.typography.fontFamily,
-    fontWeight: Theme.typography.weights.semiBold,
+    fontFamily: Theme.typography.fontFamilySemiBold,
     textAlign: 'center',
   },
   

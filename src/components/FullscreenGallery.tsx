@@ -48,7 +48,7 @@ export const FullscreenGallery: React.FC<FullscreenGalleryProps> = ({
           <Text style={styles.indicator}>
             {activeIndex + 1} / {images.length}
           </Text>
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Close gallery">
             <X size={22} color="#FFF" />
           </TouchableOpacity>
         </View>
@@ -105,9 +105,8 @@ const styles = StyleSheet.create({
   },
   indicator: {
     color: '#FFF',
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: Theme.typography.fontFamily,
+    fontSize: Theme.typography.sizes.md,
+    fontFamily: Theme.typography.fontFamilySemiBold,
   },
   closeBtn: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',

@@ -31,7 +31,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
       visible={visible}
       onRequestClose={onCancel}
     >
-      <View style={styles.overlay}>
+      <View style={styles.overlay} accessibilityRole="alert" accessibilityLabel={title} accessibilityHint={message}>
         <BlurView intensity={25} style={StyleSheet.absoluteFill} tint="dark" />
         
         <View style={styles.card}>
@@ -43,6 +43,8 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
               activeOpacity={0.8}
               style={[styles.btn, styles.cancelBtn]}
               onPress={onCancel}
+              accessibilityRole="button"
+              accessibilityLabel={cancelText}
             >
               <Text style={styles.cancelText}>{cancelText}</Text>
             </TouchableOpacity>
@@ -54,6 +56,8 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
                 destructive ? styles.destructiveBtn : styles.confirmBtn,
               ]}
               onPress={onConfirm}
+              accessibilityRole="button"
+              accessibilityLabel={confirmText}
             >
               <Text
                 style={[
@@ -97,9 +101,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: Theme.typography.sizes.md,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
     textAlign: 'center',
   },
   message: {
@@ -107,7 +110,7 @@ const styles = StyleSheet.create({
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: Theme.typography.lineHeights.md,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -137,14 +140,12 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.semiBold,
     color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilySemiBold,
   },
   btnText: {
     fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.bold,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   confirmText: {
     color: Theme.colors.primary,

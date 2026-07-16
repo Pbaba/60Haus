@@ -69,7 +69,13 @@ const ImageFeedItemComponent: React.FC<ImageFeedItemProps> = ({
   }));
 
   return (
-    <Pressable style={styles.container} onPress={handlePress}>
+    <Pressable
+      style={styles.container}
+      onPress={handlePress}
+      accessibilityRole="image"
+      accessibilityLabel="Property image gallery"
+      accessibilityHint="Double tap to save this property. Swipe left or right to view more images."
+    >
       {/* Background Crossfading Layer */}
       <View style={StyleSheet.absoluteFill}>
         {images.map((uri, index) => {
@@ -187,9 +193,8 @@ const styles = StyleSheet.create({
   },
   imagesBadgeText: {
     color: '#FFF',
-    fontSize: 10,
-    fontWeight: 'bold',
-    fontFamily: Theme.typography.fontFamily,
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   heartOverlay: {
     position: 'absolute',

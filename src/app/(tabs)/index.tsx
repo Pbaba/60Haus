@@ -636,7 +636,7 @@ export default function FeedScreen() {
               {/* Geographic Neighborhood Snapshot & Locality Tabs */}
               {loadingSnapshot ? (
                 <View style={[styles.snapshotCard, { alignItems: 'center', justifyContent: 'center', minHeight: 100 }]}>
-                  <Text style={{ color: Theme.colors.textSecondary, fontSize: 13 }}>Analyzing locality connectivity...</Text>
+                  <Text style={{ color: Theme.colors.textSecondary, fontSize: 13, fontFamily: Theme.typography.fontFamily }}>Analyzing locality connectivity...</Text>
                 </View>
               ) : snapshot ? (
                 <View style={styles.sheetSection}>
@@ -741,18 +741,18 @@ export default function FeedScreen() {
                         <View key={place.id} style={styles.nearbyPlaceItem}>
                           <View style={{ flex: 1, gap: 2 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                              <Text style={{ fontSize: 12, fontWeight: '600', color: Theme.colors.textPrimary }} numberOfLines={1}>
+                              <Text style={{ fontSize: Theme.typography.sizes.sm, fontFamily: Theme.typography.fontFamilySemiBold, color: Theme.colors.textPrimary }} numberOfLines={1}>
                                 {place.name}
                               </Text>
                               <Text style={styles.categorySubText}>{place.subcategory}</Text>
                             </View>
                             {place.optionalRating && (
-                              <Text style={{ fontSize: 10, color: '#f59e0b', fontWeight: 'bold' }}>
+                               <Text style={{ fontSize: Theme.typography.sizes.xs, color: '#f59e0b', fontFamily: Theme.typography.fontFamilyBold }}>
                                 ★ {place.optionalRating} rating
                               </Text>
                             )}
                           </View>
-                          <Text style={{ fontSize: 11, color: Theme.colors.textSecondary }}>
+                           <Text style={{ fontSize: 11, color: Theme.colors.textSecondary, fontFamily: Theme.typography.fontFamily }}>
                             {place.distance}m • {place.estimatedTravelTime} mins
                           </Text>
                         </View>
@@ -765,16 +765,16 @@ export default function FeedScreen() {
                       {snapshot.commuteHighlights.slice(0, 5).map((est, idx) => (
                         <View key={idx} style={styles.commuteItem}>
                           <View style={{ gap: 2 }}>
-                            <Text style={{ fontSize: 12, fontWeight: '600', color: Theme.colors.textPrimary }}>{est.destination}</Text>
-                            <Text style={{ fontSize: 10, color: Theme.colors.textSecondary, textTransform: 'capitalize' }}>
+                             <Text style={{ fontSize: Theme.typography.sizes.sm, fontFamily: Theme.typography.fontFamilySemiBold, color: Theme.colors.textPrimary }}>{est.destination}</Text>
+                             <Text style={{ fontSize: Theme.typography.sizes.xs, color: Theme.colors.textSecondary, fontFamily: Theme.typography.fontFamily, textTransform: 'capitalize' }}>
                               via {est.transportMode}
                             </Text>
                           </View>
                           <View style={{ alignItems: 'flex-end', gap: 2 }}>
-                            <Text style={{ fontSize: 12, fontWeight: 'bold', color: Theme.colors.primary }}>
+                             <Text style={{ fontSize: Theme.typography.sizes.sm, fontFamily: Theme.typography.fontFamilyBold, color: Theme.colors.primary }}>
                               {est.estimatedDuration} mins
                             </Text>
-                            <Text style={{ fontSize: 9, color: Theme.colors.textSecondary }}>
+                             <Text style={{ fontSize: Theme.typography.sizes.xxs, color: Theme.colors.textSecondary, fontFamily: Theme.typography.fontFamily }}>
                               {(est.distance / 1000).toFixed(1)} km
                             </Text>
                           </View>
@@ -809,7 +809,7 @@ export default function FeedScreen() {
                           </View>
                         </View>
                       ) : (
-                        <Text style={{ color: Theme.colors.textSecondary, fontSize: 12 }}>Locality market pricing trends unavailable.</Text>
+                         <Text style={{ color: Theme.colors.textSecondary, fontSize: Theme.typography.sizes.sm, fontFamily: Theme.typography.fontFamily }}>Locality market pricing trends unavailable.</Text>
                       )}
                     </View>
                   )}
@@ -836,7 +836,7 @@ export default function FeedScreen() {
                       );
                     })
                   ) : (
-                    <Text style={{ color: Theme.colors.textSecondary, fontSize: 13 }}>No listed amenities.</Text>
+                    <Text style={{ color: Theme.colors.textSecondary, fontSize: 13, fontFamily: Theme.typography.fontFamily }}>No listed amenities.</Text>
                   )}
                 </View>
               </View>
@@ -985,22 +985,20 @@ const styles = StyleSheet.create({
     gap: Theme.spacing.xs,
   },
   price: {
-    fontSize: 28,
-    fontWeight: Theme.typography.weights.bold,
+    fontSize: Theme.typography.sizes.h1,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   perMonth: {
     fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.regular,
     color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamily,
   },
   title: {
     fontSize: Theme.typography.sizes.xl,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
-    letterSpacing: -0.5,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
+    letterSpacing: Theme.typography.letterSpacing.tight,
   },
   location: {
     fontSize: Theme.typography.sizes.md,
@@ -1074,14 +1072,13 @@ const styles = StyleSheet.create({
   },
   sheetPrice: {
     fontSize: 26,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   sheetPerMonth: {
     fontSize: Theme.typography.sizes.sm,
     color: Theme.colors.textSecondary,
-    fontWeight: Theme.typography.weights.regular,
+    fontFamily: Theme.typography.fontFamily,
   },
   sheetAddress: {
     fontSize: Theme.typography.sizes.md,
@@ -1119,9 +1116,8 @@ const styles = StyleSheet.create({
   },
   specValue: {
     fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.semiBold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilySemiBold,
   },
   sheetSpecItem: {
     alignItems: 'center',
@@ -1129,9 +1125,8 @@ const styles = StyleSheet.create({
   },
   sheetSpecValue: {
     fontSize: Theme.typography.sizes.md,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
     textTransform: 'capitalize',
   },
   sheetSpecLabel: {
@@ -1144,17 +1139,16 @@ const styles = StyleSheet.create({
   },
   sheetSectionTitle: {
     fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: Theme.typography.letterSpacing.wider,
   },
   sheetDesc: {
     fontSize: Theme.typography.sizes.md,
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
-    lineHeight: 22,
+    lineHeight: Theme.typography.lineHeights.xl,
   },
   sheetAmenities: {
     flexDirection: 'row',
@@ -1189,9 +1183,8 @@ const styles = StyleSheet.create({
   },
   ownerName: {
     fontSize: Theme.typography.sizes.md,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   ownerTitle: {
     fontSize: Theme.typography.sizes.xs,
@@ -1223,11 +1216,10 @@ const styles = StyleSheet.create({
   },
   snapshotTitle: {
     fontSize: 11,
-    fontWeight: '700',
     color: Theme.colors.textSecondary,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    fontFamily: Theme.typography.fontFamily,
+    letterSpacing: Theme.typography.letterSpacing.wider,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   snapshotGrid: {
     flexDirection: 'row',
@@ -1273,7 +1265,7 @@ const styles = StyleSheet.create({
   },
   locationTabBtnTextActive: {
     color: Theme.colors.primary,
-    fontWeight: 'bold',
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   tabBodyContent: {
     padding: Theme.spacing.sm,
@@ -1293,7 +1285,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Theme.colors.border + '30',
   },
   categorySubText: {
-    fontSize: 10,
+    fontSize: Theme.typography.sizes.xs,
     color: Theme.colors.textSecondary,
     backgroundColor: Theme.colors.border + '30',
     paddingHorizontal: 5,
@@ -1317,15 +1309,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   marketLabel: {
-    fontSize: 12,
+    fontSize: Theme.typography.sizes.sm,
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
   },
   marketValue: {
     fontSize: 13,
-    fontWeight: 'bold',
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   lifestyleContainer: {
     flexDirection: 'row',
@@ -1345,8 +1336,7 @@ const styles = StyleSheet.create({
   lifestyleChipText: {
     fontSize: 11,
     color: Theme.colors.primary,
-    fontWeight: 'bold',
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   sheetContactBtn: {
     width: '100%',
@@ -1388,7 +1378,7 @@ const styles = StyleSheet.create({
   },
   reasonTextActive: {
     color: Theme.colors.primary,
-    fontWeight: Theme.typography.weights.bold,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   reportForm: {
     gap: Theme.spacing.md,
@@ -1432,20 +1422,18 @@ const styles = StyleSheet.create({
   },
   chipText: {
     color: '#FFF',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: Theme.typography.sizes.sm,
+    fontFamily: Theme.typography.fontFamilySemiBold,
     textTransform: 'capitalize',
-    fontFamily: Theme.typography.fontFamily,
   },
   welcomeGreeting: {
     color: '#FFF',
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: Theme.typography.sizes.lg,
     marginBottom: Theme.spacing.xs,
     textShadowColor: 'rgba(0, 0, 0, 0.45)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
     marginTop: 8,
   },
   resumeCard: {
@@ -1465,9 +1453,8 @@ const styles = StyleSheet.create({
   },
   resumeCardTitle: {
     color: Theme.colors.primary,
-    fontSize: 12,
-    fontWeight: '700',
-    fontFamily: Theme.typography.fontFamily,
+    fontSize: Theme.typography.sizes.sm,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   resumeCardDesc: {
     color: 'rgba(255, 255, 255, 0.7)',
@@ -1489,15 +1476,15 @@ const styles = StyleSheet.create({
   resumeBtnText: {
     color: '#000',
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   resumeDismissBtn: {
     padding: 6,
   },
   resumeDismissText: {
     color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: Theme.typography.sizes.sm,
+    fontFamily: Theme.typography.fontFamilySemiBold,
   },
   sinceLastContainer: {
     flex: 1,
@@ -1521,17 +1508,16 @@ const styles = StyleSheet.create({
     marginBottom: Theme.spacing.md,
   },
   sinceLastTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: Theme.typography.sizes.xl,
     color: '#FFF',
     marginBottom: Theme.spacing.xs,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
   },
   sinceLastSubtitle: {
-    fontSize: 12,
+    fontSize: Theme.typography.sizes.sm,
     color: 'rgba(255, 255, 255, 0.55)',
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: Theme.typography.lineHeights.md,
     marginBottom: Theme.spacing.lg,
     fontFamily: Theme.typography.fontFamily,
   },
@@ -1553,19 +1539,18 @@ const styles = StyleSheet.create({
     borderColor: Theme.colors.border,
   },
   sinceLastValue: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: Theme.typography.sizes.xl,
     color: Theme.colors.primary,
     marginRight: Theme.spacing.md,
     width: 24,
     textAlign: 'center',
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   sinceLastLabel: {
-    fontSize: 12,
+    fontSize: Theme.typography.sizes.sm,
     color: '#FFF',
-    fontWeight: '600',
     flex: 1,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilySemiBold,
   },
   trustSignalsContainer: {
     flexDirection: 'row',
@@ -1586,11 +1571,11 @@ const styles = StyleSheet.create({
   },
   trustSignalText: {
     color: Theme.colors.primary,
-    fontSize: 9,
-    fontWeight: '700',
+    fontSize: Theme.typography.sizes.xxs,
     marginLeft: 3,
     textTransform: 'uppercase',
-    letterSpacing: 0.2,
+    letterSpacing: Theme.typography.letterSpacing.wide,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   explanationsContainer: {
     flexDirection: 'row',
@@ -1611,8 +1596,8 @@ const styles = StyleSheet.create({
   },
   explanationTagText: {
     color: '#FFF',
-    fontSize: 10,
-    fontWeight: '600',
+    fontSize: Theme.typography.sizes.xs,
     marginLeft: 3,
+    fontFamily: Theme.typography.fontFamilySemiBold,
   },
 });

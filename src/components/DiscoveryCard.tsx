@@ -47,6 +47,9 @@ export const DiscoveryCard: React.FC<DiscoveryCardProps> = ({
         onPressOut={handlePressOut}
         onPress={handlePress}
         style={styles.pressable}
+        accessibilityRole="button"
+        accessibilityLabel={title}
+        accessibilityHint={description}
       >
         <BlurView intensity={25} tint="dark" style={styles.blur}>
           <View style={styles.iconWrapper}>
@@ -95,17 +98,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   textWrapper: {
-    marginTop: 8,
+    marginTop: Theme.spacing.sm,
   },
   title: {
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: Theme.typography.fontFamilySemiBold,
   },
   description: {
     color: 'rgba(255, 255, 255, 0.65)',
     fontSize: 11,
-    marginTop: 4,
-    lineHeight: 14,
+    fontFamily: Theme.typography.fontFamily,
+    marginTop: Theme.spacing.xs,
+    lineHeight: Theme.typography.lineHeights.xs,
   },
 });

@@ -76,6 +76,9 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
             activeOpacity={Theme.motion.presets.press.scale}
             onPress={() => onTabPress(tab.key)}
             style={styles.tabButton}
+            accessibilityRole="tab"
+            accessibilityLabel={tab.label}
+            accessibilityState={{ selected: isActive }}
           >
             <View style={isActive ? styles.activeIconWrapper : styles.iconContainer}>
               <Icon

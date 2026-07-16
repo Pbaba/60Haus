@@ -310,9 +310,8 @@ const styles = StyleSheet.create<any>({
   toastText: {
     color: '#FAFAFA',
     fontSize: 13,
-    fontWeight: '500',
     flex: 1,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyMedium,
   },
   feedbackOverlay: {
     position: 'absolute',
@@ -339,16 +338,15 @@ const styles = StyleSheet.create<any>({
   },
   feedbackTitle: {
     color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: Theme.typography.sizes.h3,
     textAlign: 'center',
     marginBottom: 12,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
   },
   feedbackDesc: {
     color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: Theme.typography.sizes.md,
+    lineHeight: Theme.typography.lineHeights.lg,
     textAlign: 'center',
     marginBottom: 40,
     paddingHorizontal: 16,
@@ -369,8 +367,7 @@ const styles = StyleSheet.create<any>({
   primaryActionText: {
     color: '#0F0F12',
     fontSize: 15,
-    fontWeight: '600',
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilySemiBold,
   },
   secondaryActionBtn: {
     width: '100%',
@@ -385,7 +382,6 @@ const styles = StyleSheet.create<any>({
   secondaryActionText: {
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '600',
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilySemiBold,
   },
 });

@@ -92,7 +92,12 @@ export const FeedbackState: React.FC<FeedbackStateProps> = ({
   };
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      accessible={true}
+      accessibilityRole="summary"
+      accessibilityLabel={`${title || 'Status update'}. ${subtitle || ''}`}
+    >
       {renderVisualAndText()}
       {onRetry && type !== 'loading' && (
         <Button variant="primary" style={styles.actionBtn} onPress={onRetry}>
@@ -119,9 +124,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: Theme.typography.sizes.lg,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
     marginTop: Theme.spacing.md,
     textAlign: 'center',
   },
@@ -130,7 +134,7 @@ const styles = StyleSheet.create({
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: Theme.typography.lineHeights.lg,
     paddingHorizontal: Theme.spacing.lg,
   },
   actionBtn: {

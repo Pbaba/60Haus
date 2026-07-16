@@ -23,7 +23,7 @@ export default function OnboardingScreen() {
       >
         <View style={styles.overlay}>
           <View style={styles.header}>
-            <Text style={styles.logo}>60house</Text>
+            <Text style={styles.logo}>60Haus</Text>
           </View>
           
           <View style={styles.footer}>
@@ -67,29 +67,27 @@ const styles = StyleSheet.create({
     marginTop: Theme.spacing.xxl,
   },
   logo: {
-    fontSize: 28,
-    fontWeight: Theme.typography.weights.black,
+    fontSize: Theme.typography.sizes.h1,
     color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamily,
-    letterSpacing: -0.5,
+    fontFamily: Theme.typography.fontFamilyBold,
+    letterSpacing: Theme.typography.letterSpacing.tight,
   },
   footer: {
     marginBottom: Theme.spacing.xxl,
     gap: Theme.spacing.md,
   },
   title: {
-    fontSize: 32,
-    fontWeight: Theme.typography.weights.bold,
+    fontSize: Theme.typography.sizes.display,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
-    lineHeight: 40,
-    letterSpacing: -0.5,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
+    lineHeight: Theme.typography.lineHeights.hero,
+    letterSpacing: Theme.typography.letterSpacing.tight,
   },
   subtitle: {
     fontSize: Theme.typography.sizes.md,
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
-    lineHeight: 22,
+    lineHeight: Theme.typography.lineHeights.xl,
     marginBottom: Theme.spacing.md,
   },
   btnContainer: {

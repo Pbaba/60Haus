@@ -138,9 +138,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: Theme.typography.sizes.h1,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
   },
   headerSub: {
     fontSize: Theme.typography.sizes.sm,
@@ -180,18 +179,16 @@ const styles = StyleSheet.create({
   },
   price: {
     fontSize: Theme.typography.sizes.xl,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   deleteBtn: {
     padding: Theme.spacing.xs,
   },
   title: {
     fontSize: Theme.typography.sizes.lg,
-    fontWeight: Theme.typography.weights.semiBold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
     marginTop: Theme.spacing.xs,
   },
   location: {

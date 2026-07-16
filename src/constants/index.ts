@@ -1,5 +1,5 @@
 export const APP_CONFIG = {
-  appName: '60house',
+  appName: '60Haus',
   maxVideoSizeMB: 50,
   defaultPageLimit: 10,
 };

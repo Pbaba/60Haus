@@ -31,17 +31,31 @@ export const Theme = {
   },
 
   typography: {
-    fontFamily: 'Inter',
+    // Primary UI font — Geist (loaded locally from assets/fonts/)
+    fontFamily: 'GeistRegular',
+    fontFamilyMedium: 'GeistMedium',
+    fontFamilySemiBold: 'GeistSemiBold',
+    fontFamilyBold: 'GeistBold',
+
+    // Editorial font — Lora (used for titles, headings, hero text only)
+    fontFamilyEditorial: 'LoraRegular',
+    fontFamilyEditorialSemiBold: 'LoraSemiBold',
+    fontFamilyEditorialBold: 'LoraBold',
+
     sizes: {
+      xxs: 9,
       xs: 10,
       sm: 12,
       md: 14,
       lg: 16,
       xl: 18,
       xxl: 20,
+      h3: 22,
       h2: 24,
       h1: 28,
+      display: 32,
       hero: 36,
+      splash: 48,
     },
     weights: {
       regular: '400' as const,
@@ -50,11 +64,23 @@ export const Theme = {
       bold: '700' as const,
       black: '900' as const,
     },
+    letterSpacing: {
+      tighter: -1.5,
+      tight: -0.5,
+      normal: 0,
+      wide: 0.2,
+      wider: 0.5,
+      widest: 1,
+    },
     lineHeights: {
-      tight: 1.25,
-      normal: 1.5,
-      relaxed: 1.75,
-    }
+      xs: 14,
+      sm: 16,
+      md: 18,
+      lg: 20,
+      xl: 22,
+      xxl: 28,
+      hero: 40,
+    },
   },
 
   spacing: {

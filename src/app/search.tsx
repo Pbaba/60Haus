@@ -192,9 +192,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: Theme.typography.sizes.md,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   resetTextBtn: {
     paddingVertical: Theme.spacing.xs,
@@ -203,8 +202,7 @@ const styles = StyleSheet.create({
   resetText: {
     fontSize: Theme.typography.sizes.sm,
     color: Theme.colors.primary,
-    fontWeight: Theme.typography.weights.semiBold,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilySemiBold,
   },
   scrollContent: {
     paddingHorizontal: Theme.spacing.xl,
@@ -216,11 +214,10 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: Theme.typography.sizes.sm,
-    fontWeight: Theme.typography.weights.bold,
     color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamily,
+    fontFamily: Theme.typography.fontFamilyBold,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: Theme.typography.letterSpacing.wider,
   },
   chipContainer: {
     flexDirection: 'row',
@@ -247,7 +244,7 @@ const styles = StyleSheet.create({
   },
   activeChipText: {
     color: Theme.colors.primary,
-    fontWeight: Theme.typography.weights.bold,
+    fontFamily: Theme.typography.fontFamilyBold,
   },
   footer: {
     paddingHorizontal: Theme.spacing.xl,
