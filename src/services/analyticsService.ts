@@ -121,6 +121,51 @@ export const analyticsService = {
     trackEvent('discovery_mode_selected', { mode });
   },
 
+  trackCollectionCreated(collectionId: string, name: string) {
+    trackEvent('collection_created', { collectionId, name });
+  },
+
+  trackCollectionDeleted(collectionId: string) {
+    trackEvent('collection_deleted', { collectionId });
+  },
+
+  trackCollectionOpened(collectionId: string, name: string) {
+    trackEvent('collection_opened', { collectionId, name });
+  },
+
+  trackPropertyAddedToCollection(propertyId: string, collectionId: string) {
+    trackEvent('property_added_to_collection', { propertyId, collectionId });
+  },
+
+  trackPropertyRemovedFromCollection(propertyId: string, collectionId: string) {
+    trackEvent('property_removed_from_collection', { propertyId, collectionId });
+  },
+
+  trackSavedSearchCreated(name: string) {
+    trackEvent('saved_search_created', { name });
+  },
+
+  trackSavedSearchExecuted(name: string) {
+    trackEvent('saved_search_executed', { name });
+  },
+
+  trackAlertCreated(alertType: string, searchName?: string) {
+    trackEvent('alert_created', { alertType, searchName });
+  },
+
+  trackAlertDeleted(alertId: string) {
+    trackEvent('alert_deleted', { alertId });
+  },
+
+  trackPropertyCompared(propertyIds: string[]) {
+    trackEvent('property_compared', { propertyIds });
+  },
+
+  trackRecentlyViewedOpened() {
+    trackEvent('recently_viewed_opened', {});
+  },
+
+
   /** Get the current event queue for debugging */
   getEventQueue(): readonly AnalyticsEvent[] {
     return eventQueue;

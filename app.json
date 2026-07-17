@@ -7,12 +7,13 @@
     "icon": "./assets/images/icon.png",
     "scheme": "sixtyhouse",
     "userInterfaceStyle": "automatic",
-
     "ios": {
       "bundleIdentifier": "com.pbaba.sixtyhouse",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "associatedDomains": [
+        "applinks:60haus.app"
+      ]
     },
-
     "android": {
       "package": "com.pbaba.sixtyhouse",
       "adaptiveIcon": {
@@ -21,14 +22,29 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "60haus.app",
+              "pathPrefix": "/"
+            }
+          ],
+          "category": [
+            "DEFAULT",
+            "BROWSABLE"
+          ]
+        }
+      ]
     },
-
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-
     "plugins": [
       "expo-router",
       [
@@ -40,9 +56,11 @@
         }
       ],
       "expo-secure-store",
-      "expo-video"
+      "expo-video",
+      "expo-image",
+      "expo-status-bar",
+      "expo-web-browser"
     ],
-
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

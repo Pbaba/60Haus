@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Alert, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { ScreenContainer } from '../components/ScreenContainer';
@@ -29,6 +29,8 @@ export default function SettingsScreen() {
   const [preferredListingType, setPreferredListingType] = useState<'rent' | 'buy' | null>(profile?.preferredListingType || null);
   const [preferredBudget, setPreferredBudget] = useState(profile?.preferredBudget ? String(profile.preferredBudget) : '');
   const [saveLoading, setSaveLoading] = useState(false);
+  const [searchAlertsEnabled, setSearchAlertsEnabled] = useState(true);
+  const [priceAlertsEnabled, setPriceAlertsEnabled] = useState(true);
 
   const handleSignOut = async () => {
     await signOut();
@@ -174,19 +176,36 @@ export default function SettingsScreen() {
 
         {/* Grouped General Settings */}
         <View style={styles.groupCard}>
-          <TouchableOpacity
-            style={styles.rowItem}
-            onPress={() => alert('Notifications preferences')}
-          >
-            <View style={styles.rowLabel}>
-              <Bell size={20} color={Theme.colors.textSecondary} />
-              <Text style={styles.rowText}>Push Notifications</Text>
+          <View style={styles.notificationGroup}>
+            <View style={styles.rowLabelHeader}>
+              <Bell size={20} color={Theme.colors.primary} />
+              <Text style={styles.rowTextHeader}>Notification Preferences</Text>
             </View>
-          </TouchableOpacity>
+            <View style={styles.rowDivider} />
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>Saved Search Matches</Text>
+              <Switch
+                value={searchAlertsEnabled}
+                onValueChange={setSearchAlertsEnabled}
+                trackColor={{ false: '#2C2C30', true: Theme.colors.primary }}
+                thumbColor={searchAlertsEnabled ? '#FFFFFF' : '#8E8E93'}
+              />
+            </View>
+            <View style={styles.rowDivider} />
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>Price Drop Updates</Text>
+              <Switch
+                value={priceAlertsEnabled}
+                onValueChange={setPriceAlertsEnabled}
+                trackColor={{ false: '#2C2C30', true: Theme.colors.primary }}
+                thumbColor={priceAlertsEnabled ? '#FFFFFF' : '#8E8E93'}
+              />
+            </View>
+          </View>
           <View style={styles.rowDivider} />
           <TouchableOpacity
             style={styles.rowItem}
-            onPress={() => alert('Privacy preferences')}
+            onPress={() => Alert.alert('Privacy & Security', 'All personal discovery details and browsing logs are stored securely.')}
           >
             <View style={styles.rowLabel}>
               <Shield size={20} color={Theme.colors.textSecondary} />
@@ -358,5 +377,32 @@ const styles = StyleSheet.create({
   pillTextActive: {
     color: Theme.colors.primary,
     fontFamily: Theme.typography.fontFamilyBold,
+  },
+  notificationGroup: {
+    paddingVertical: Theme.spacing.md,
+  },
+  rowLabelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Theme.spacing.md,
+    paddingHorizontal: Theme.spacing.lg,
+    paddingBottom: Theme.spacing.md,
+  },
+  rowTextHeader: {
+    color: Theme.colors.textPrimary,
+    fontSize: Theme.typography.sizes.md,
+    fontFamily: Theme.typography.fontFamilyBold,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Theme.spacing.md,
+    paddingHorizontal: Theme.spacing.lg,
+  },
+  toggleLabel: {
+    color: Theme.colors.textSecondary,
+    fontSize: Theme.typography.sizes.sm,
+    fontFamily: Theme.typography.fontFamily,
   },
 });

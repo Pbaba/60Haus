@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Share, Linking, Alert } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Share, Linking, Alert, Modal, TextInput } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -11,20 +11,32 @@ import { FeedbackState } from '../../components/FeedbackState';
 import { FullscreenGallery } from '../../components/FullscreenGallery';
 import { useProperties } from '../../hooks/useProperties';
 import { useAuth } from '../../hooks/useAuth';
+import { useFeedback } from '../../context/FeedbackContext';
 import { profileService } from '../../services/profileService';
 import { discoveryService } from '../../services/discoveryService';
 import { historyService } from '../../services/historyService';
 import { supabase } from '../../lib/supabase';
 import { Theme } from '../../theme';
 import { formatCurrency } from '../../utils';
-import { ArrowLeft, MapPin, Heart, Share2, Phone } from 'lucide-react-native';
+import { ArrowLeft, MapPin, Heart, Share2, Phone, GitCompare } from 'lucide-react-native';
 import { PropertyListing, UserProfile } from '../../types';
+import { analyticsService } from '../../services/analyticsService';
 
 export default function PropertyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { savedPropertyIds, toggleSave, incrementContactCount } = useProperties();
+  const {
+    savedPropertyIds,
+    toggleSave,
+    incrementContactCount,
+    collections,
+    addPropertyToCollection,
+    createCollection,
+    compareQueue,
+    toggleCompare,
+  } = useProperties();
   const { user, isGuest } = useAuth();
+  const { showToast } = useFeedback();
 
   const [property, setProperty] = useState<PropertyListing | null>(null);
   const [ownerProfile, setOwnerProfile] = useState<UserProfile | null>(null);
@@ -33,7 +45,16 @@ export default function PropertyDetailScreen() {
   const [error, setError] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
 
+  // Collections modal states
+  const [saveModalVisible, setSaveModalVisible] = useState(false);
+  const [selectedColId, setSelectedColId] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState('');
+  const [creatingNewCollection, setCreatingNewCollection] = useState(false);
+  const [newColName, setNewColName] = useState('');
+  const [newColDesc, setNewColDesc] = useState('');
+
   const isSaved = id ? savedPropertyIds.has(id) : false;
+  const isCompared = id ? compareQueue.includes(id) : false;
 
   const loadLiveDetails = useCallback(async () => {
     if (!id) return;
@@ -69,6 +90,7 @@ export default function PropertyDetailScreen() {
         imageUrls: prop.property_images ? prop.property_images.map((img: any) => img.image_url) : [],
         amenities: prop.amenities || [],
         viewCount: prop.view_count || 0,
+        locality: prop.locality,
       };
 
       setProperty(mappedProperty);
@@ -117,11 +139,12 @@ export default function PropertyDetailScreen() {
     if (!property) return;
     try {
       await Share.share({
-        message: `Check out this amazing walkthrough: ${property.title} in ${property.city} for ${formatCurrency(property.price)}/mo!`,
+        message: `Check out this amazing walkthrough: ${property.title} in ${property.locality || property.city} for ${formatCurrency(property.price)}/mo!`,
         url: `https://60haus.app/property/${property.id}`,
       });
-    } catch (e) {
-      console.warn('Share failed:', e);
+      analyticsService.trackScreenView('property_detail');
+    } catch {
+      console.warn('Share failed');
     }
   };
 
@@ -137,7 +160,90 @@ export default function PropertyDetailScreen() {
       );
       return;
     }
-    toggleSave(id);
+
+    if (isSaved) {
+      Alert.alert(
+        'Unsave Property',
+        'This property is already bookmarked. Manage collections or unsave?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Manage Collections',
+            onPress: () => {
+              if (collections.length === 0) {
+                setCreatingNewCollection(true);
+              } else {
+                setCreatingNewCollection(false);
+                setSelectedColId(collections[0].id);
+              }
+              setSaveModalVisible(true);
+            },
+          },
+          {
+            text: 'Unsave/Remove',
+            style: 'destructive',
+            onPress: () => {
+              toggleSave(id);
+              showToast('Removed from saved homes');
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    // Default bookmark save or customize collection flow
+    if (collections.length === 0) {
+      setCreatingNewCollection(true);
+    } else {
+      setCreatingNewCollection(false);
+      setSelectedColId(collections[0].id);
+    }
+    setSaveModalVisible(true);
+  };
+
+  const handleSaveToCollectionSubmit = async () => {
+    if (!id) return;
+
+    try {
+      // Opt-in save properties globally to retain bookmarks sync
+      if (!isSaved) {
+        toggleSave(id);
+      }
+
+      if (creatingNewCollection) {
+        if (!newColName.trim()) {
+          showToast('Collection name is required.');
+          return;
+        }
+        const col = await createCollection(newColName.trim(), newColDesc.trim());
+        analyticsService.trackCollectionCreated(col.id, col.name);
+        await addPropertyToCollection(col.id, id, noteText.trim());
+        analyticsService.trackPropertyAddedToCollection(id, col.id);
+        
+        setNewColName('');
+        setNewColDesc('');
+      } else {
+        if (!selectedColId) {
+          showToast('Please select a collection.');
+          return;
+        }
+        await addPropertyToCollection(selectedColId, id, noteText.trim());
+        analyticsService.trackPropertyAddedToCollection(id, selectedColId);
+      }
+
+      setNoteText('');
+      setSaveModalVisible(false);
+    } catch {
+      showToast('Failed to save to collection.');
+    }
+  };
+
+  const handleCompareToggle = () => {
+    if (!id) return;
+    toggleCompare(id);
+    const added = !isCompared;
+    showToast(added ? 'Added to comparison queue' : 'Removed from comparison queue');
   };
 
   const handleContact = () => {
@@ -233,6 +339,9 @@ export default function PropertyDetailScreen() {
           {property.title}
         </Text>
         <View style={styles.headerActions}>
+          <TouchableOpacity onPress={handleCompareToggle} style={styles.iconBtn} accessibilityLabel="Toggle compare listing" accessibilityRole="button">
+            <GitCompare size={22} color={isCompared ? Theme.colors.primary : Theme.colors.textPrimary} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={handleSaveToggle} style={styles.iconBtn}>
             <Heart size={22} color={isSaved ? Theme.colors.primary : Theme.colors.textPrimary} fill={isSaved ? Theme.colors.primary : 'transparent'} />
           </TouchableOpacity>
@@ -389,6 +498,120 @@ export default function PropertyDetailScreen() {
           onClose={() => setGalleryIndex(null)}
         />
       )}
+
+      {/* Modal - Save to Collection Picker */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={saveModalVisible}
+        onRequestClose={() => setSaveModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent} accessibilityViewIsModal={true}>
+            <Text style={styles.modalTitle}>
+              {creatingNewCollection ? 'Create Collection & Save' : 'Save to Collection'}
+            </Text>
+
+            {creatingNewCollection ? (
+              <View style={{ gap: Theme.spacing.md }}>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="Collection Name (e.g. Dream Homes)"
+                  placeholderTextColor={Theme.colors.textSecondary}
+                  value={newColName}
+                  onChangeText={setNewColName}
+                  maxLength={30}
+                  accessibilityLabel="Collection Name Input"
+                />
+                <TextInput
+                  style={[styles.modalInput, styles.modalInputDesc]}
+                  placeholder="Description (Optional)"
+                  placeholderTextColor={Theme.colors.textSecondary}
+                  value={newColDesc}
+                  onChangeText={setNewColDesc}
+                  multiline
+                  maxLength={100}
+                  accessibilityLabel="Collection Description Input"
+                />
+                {collections.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setCreatingNewCollection(false)}
+                    accessibilityLabel="Choose existing collection toggle"
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.toggleCreateText}>Choose existing collection</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : (
+              <View style={{ gap: Theme.spacing.md }}>
+                <Text style={styles.modalSubtitle}>Select Target Collection:</Text>
+                <ScrollView style={styles.collectionsSelectorList} nestedScrollEnabled>
+                  {collections.map((col) => (
+                    <TouchableOpacity
+                      key={col.id}
+                      style={[
+                        styles.collectionSelectItem,
+                        selectedColId === col.id && styles.collectionSelectItemActive,
+                      ]}
+                      onPress={() => setSelectedColId(col.id)}
+                      accessibilityLabel={`Select collection ${col.name}`}
+                      accessibilityRole="button"
+                    >
+                      <Text
+                        style={[
+                          styles.collectionSelectText,
+                          selectedColId === col.id && styles.collectionSelectTextActive,
+                        ]}
+                      >
+                        {col.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity
+                  onPress={() => setCreatingNewCollection(true)}
+                  accessibilityLabel="Create custom collection toggle"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.toggleCreateText}>+ Create New Collection</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Note text input */}
+            <TextInput
+              style={styles.modalInputNote}
+              placeholder="Add personal note (e.g. kitchen size, view)..."
+              placeholderTextColor={Theme.colors.textSecondary}
+              value={noteText}
+              onChangeText={setNoteText}
+              multiline
+              maxLength={200}
+              accessibilityLabel="Personal Listing Note"
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setSaveModalVisible(false)}
+                accessibilityLabel="Cancel saving listing"
+                accessibilityRole="button"
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSaveBtn}
+                onPress={handleSaveToCollectionSubmit}
+                accessibilityLabel="Confirm save to collection"
+                accessibilityRole="button"
+              >
+                <Text style={styles.modalSaveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -605,5 +828,118 @@ const styles = StyleSheet.create({
   contactBtn: {
     width: '100%',
     marginTop: Theme.spacing.sm,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Theme.spacing.xl,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 320,
+    backgroundColor: Theme.colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    padding: Theme.spacing.xl,
+    gap: Theme.spacing.md,
+  },
+  modalTitle: {
+    fontSize: Theme.typography.sizes.md,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
+    color: Theme.colors.textPrimary,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.textSecondary,
+  },
+  modalInput: {
+    backgroundColor: Theme.colors.background,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    borderRadius: 8,
+    paddingHorizontal: Theme.spacing.md,
+    paddingVertical: Theme.spacing.sm,
+    color: Theme.colors.textPrimary,
+    fontSize: Theme.typography.sizes.sm,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  modalInputDesc: {
+    height: 60,
+    textAlignVertical: 'top',
+  },
+  modalInputNote: {
+    backgroundColor: Theme.colors.background,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    borderRadius: 8,
+    paddingHorizontal: Theme.spacing.md,
+    paddingVertical: Theme.spacing.sm,
+    color: Theme.colors.textPrimary,
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamily,
+    height: 50,
+    textAlignVertical: 'top',
+  },
+  toggleCreateText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilySemiBold,
+    color: Theme.colors.primary,
+    textAlign: 'center',
+  },
+  collectionsSelectorList: {
+    maxHeight: 120,
+  },
+  collectionSelectItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.border,
+  },
+  collectionSelectItemActive: {
+    backgroundColor: '#1E1E22',
+  },
+  collectionSelectText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamily,
+    color: Theme.colors.textSecondary,
+  },
+  collectionSelectTextActive: {
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.primary,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: Theme.spacing.md,
+    marginTop: Theme.spacing.sm,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: Theme.spacing.sm,
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+  },
+  modalCancelText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilySemiBold,
+    color: Theme.colors.textSecondary,
+  },
+  modalSaveBtn: {
+    flex: 1,
+    backgroundColor: Theme.colors.primary,
+    paddingVertical: Theme.spacing.sm,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  modalSaveText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.background,
   },
 });
