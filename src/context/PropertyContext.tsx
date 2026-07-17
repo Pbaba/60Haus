@@ -1,13 +1,14 @@
 import React, { createContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { hapticsService } from '../services/hapticsService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PropertyListing, DiscoveryMode } from '../types';
+import { PropertyListing, DiscoveryMode, Collection } from '../types';
 import { SearchFilters } from '../components/SearchOverlay';
 import { propertyService } from '../services/propertyService';
 import { discoveryService } from '../services/discoveryService';
 import { propertyUploadService, VideoAsset } from '../services/propertyUploadService';
 import { bookmarkService } from '../services/bookmarkService';
 import { historyService } from '../services/historyService';
+import { collectionService } from '../services/collectionService';
 import { enrichPropertyListing } from '../utils/propertyIntelligence';
 import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../hooks/useProfile';
@@ -52,6 +53,20 @@ interface PropertyContextType {
   hasExactMatchesRemaining: boolean;
   flexibleLevel: number;
   setFlexibleLevel: React.Dispatch<React.SetStateAction<number>>;
+
+  // Comparison
+  compareQueue: string[];
+  toggleCompare: (id: string) => void;
+  clearCompareQueue: () => void;
+
+  // Collections
+  collections: Collection[];
+  fetchCollections: () => Promise<void>;
+  createCollection: (name: string, description?: string) => Promise<Collection>;
+  deleteCollection: (id: string) => Promise<void>;
+  addPropertyToCollection: (collectionId: string, propertyId: string, notes?: string) => Promise<void>;
+  removePropertyFromCollection: (collectionId: string, propertyId: string) => Promise<void>;
+  updatePropertyNote: (collectionId: string, propertyId: string, notes: string) => Promise<void>;
 }
 
 interface FeedCacheEntry {
@@ -86,6 +101,32 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const savedPropertiesRef = useRef(savedProperties);
   const profileRef = useRef(profile);
+
+  const [compareQueue, setCompareQueue] = useState<string[]>([]);
+  const [collections, setCollections] = useState<Collection[]>([]);
+
+  // Load initial compareQueue on mount
+  useEffect(() => {
+    const loadCompareQueue = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('@compareQueue');
+        if (stored) {
+          setCompareQueue(JSON.parse(stored));
+        }
+      } catch (e) {
+        console.error('Failed to load compareQueue from AsyncStorage:', e);
+      }
+    };
+    loadCompareQueue();
+  }, []);
+
+  const saveCompareQueue = async (queue: string[]) => {
+    try {
+      await AsyncStorage.setItem('@compareQueue', JSON.stringify(queue));
+    } catch (e) {
+      console.error('Failed to save compareQueue to AsyncStorage:', e);
+    }
+  };
 
   useEffect(() => {
     savedPropertiesRef.current = savedProperties;
@@ -129,22 +170,26 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     loadPersistedConfig();
   }, []);
 
-  // Fetch bookmarks automatically on user auth change
+  // Fetch bookmarks & collections automatically on user auth change
   useEffect(() => {
     if (user && !isGuest) {
-      const loadBookmarks = async () => {
+      const loadBookmarksAndCollections = async () => {
         try {
           const bookmarked = await bookmarkService.getSavedProperties(user.id);
           setSavedProperties(bookmarked);
           setSavedPropertyIds(new Set(bookmarked.map((b) => b.id)));
+
+          const cols = await collectionService.getCollections(user.id);
+          setCollections(cols);
         } catch (e) {
-          console.error('Error fetching live saved homes:', e);
+          console.error('Error fetching live saved homes/collections:', e);
         }
       };
-      loadBookmarks();
+      loadBookmarksAndCollections();
     } else {
       setSavedProperties([]);
       setSavedPropertyIds(new Set());
+      setCollections([]);
     }
   }, [user, isGuest]);
 
@@ -641,6 +686,69 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, []);
 
+  // Comparison Handlers
+  const toggleCompare = useCallback(async (id: string) => {
+    setCompareQueue((prev) => {
+      let next: string[];
+      if (prev.includes(id)) {
+        next = prev.filter((item) => item !== id);
+      } else {
+        if (prev.length >= 4) {
+          showToast('You can compare up to 4 properties simultaneously.');
+          return prev;
+        }
+        next = [...prev, id];
+      }
+      saveCompareQueue(next);
+      return next;
+    });
+  }, [showToast]);
+
+  const clearCompareQueue = useCallback(async () => {
+    setCompareQueue([]);
+    saveCompareQueue([]);
+  }, []);
+
+  // Collections Handlers
+  const fetchCollections = useCallback(async () => {
+    if (isGuest || !user) return;
+    try {
+      const cols = await collectionService.getCollections(user.id);
+      setCollections(cols);
+    } catch (e) {
+      console.warn('Failed to fetch collections:', e);
+    }
+  }, [isGuest, user]);
+
+  const createCollection = useCallback(async (name: string, description?: string) => {
+    if (isGuest || !user) throw new Error('Authentication required');
+    const newCol = await collectionService.createCollection(user.id, name, description);
+    fetchCollections();
+    return newCol;
+  }, [isGuest, user, fetchCollections]);
+
+  const deleteCollection = useCallback(async (id: string) => {
+    await collectionService.deleteCollection(id);
+    fetchCollections();
+  }, [fetchCollections]);
+
+  const addPropertyToCollection = useCallback(async (collectionId: string, propertyId: string, notes?: string) => {
+    await collectionService.addPropertyToCollection(collectionId, propertyId, notes);
+    fetchCollections();
+    showToast('Saved to collection');
+  }, [fetchCollections, showToast]);
+
+  const removePropertyFromCollection = useCallback(async (collectionId: string, propertyId: string) => {
+    await collectionService.removePropertyFromCollection(collectionId, propertyId);
+    fetchCollections();
+    showToast('Removed from collection');
+  }, [fetchCollections, showToast]);
+
+  const updatePropertyNote = useCallback(async (collectionId: string, propertyId: string, notes: string) => {
+    await collectionService.updatePropertyNote(collectionId, propertyId, notes);
+    fetchCollections();
+  }, [fetchCollections]);
+
   const contextValue = useMemo(() => ({
     properties,
     filteredProperties: properties,
@@ -669,6 +777,16 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     hasExactMatchesRemaining,
     flexibleLevel,
     setFlexibleLevel,
+    compareQueue,
+    toggleCompare,
+    clearCompareQueue,
+    collections,
+    fetchCollections,
+    createCollection,
+    deleteCollection,
+    addPropertyToCollection,
+    removePropertyFromCollection,
+    updatePropertyNote,
   }), [
     properties,
     savedPropertyIds,
@@ -695,6 +813,16 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setDiscoveryMode,
     hasExactMatchesRemaining,
     flexibleLevel,
+    compareQueue,
+    toggleCompare,
+    clearCompareQueue,
+    collections,
+    fetchCollections,
+    createCollection,
+    deleteCollection,
+    addPropertyToCollection,
+    removePropertyFromCollection,
+    updatePropertyNote,
   ]);
 
   return (
@@ -703,3 +831,4 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     </PropertyContext.Provider>
   );
 };
+

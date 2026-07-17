@@ -71,4 +71,14 @@ export const historyService = {
         };
       });
   },
+
+  async clearHistory(userId: string): Promise<void> {
+    const { error } = await supabase
+      .from('recently_viewed')
+      .delete()
+      .eq('user_id', userId);
+
+    if (error) throw error;
+  },
 };
+

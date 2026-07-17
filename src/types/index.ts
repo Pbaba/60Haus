@@ -101,3 +101,41 @@ export interface PropertyReport {
   reason: string;
   createdAt: string;
 }
+
+export interface Collection {
+  id: string;
+  userId: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+  propertiesCount?: number;
+  coverImageUrl?: string;
+}
+
+export interface CollectionProperty {
+  id: string;
+  collectionId: string;
+  propertyId: string;
+  notes?: string;
+  createdAt: string;
+  property?: PropertyListing;
+}
+
+export interface SavedSearch {
+  id: string;
+  userId: string;
+  name?: string;
+  filters: any;
+  isPinned: boolean;
+  createdAt: string;
+}
+
+export interface AlertSubscription {
+  id: string;
+  userId: string;
+  searchId?: string;
+  alertType: 'new_matching_property' | 'price_drop' | 'verified_owner' | 'listing_updated';
+  isActive: boolean;
+  createdAt: string;
+}
+

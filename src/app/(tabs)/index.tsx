@@ -9,6 +9,9 @@ import {
   ScrollView,
   Alert,
   Linking,
+  Share,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
@@ -16,7 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SavedSearchPanel } from '../../components/SavedSearchPanel';
 import { useAuth } from '../../hooks/useAuth';
 import { Image } from 'expo-image';
-import { Search, Award } from 'lucide-react-native';
+import { Search, Award, Share2, Heart, GitCompare, ArrowRight } from 'lucide-react-native';
 import { useFeedback } from '../../context/FeedbackContext';
 import { profileService } from '../../services/profileService';
 import { ScreenContainer } from '../../components/ScreenContainer';
@@ -37,6 +40,7 @@ import { PropertyListing, DiscoveryMode } from '../../types';
 import { SearchFilters } from '../../components/SearchOverlay';
 import { hapticsService } from '../../services/hapticsService';
 import { reportService } from '../../services/reportService';
+import { analyticsService } from '../../services/analyticsService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -72,6 +76,11 @@ export default function FeedScreen() {
     incrementContactCount,
     filters,
     setFilters,
+    compareQueue,
+    toggleCompare,
+    collections,
+    addPropertyToCollection,
+    createCollection,
   } = useProperties();
   const { showToast, showTransactionFeedback } = useFeedback();
 
@@ -93,10 +102,128 @@ export default function FeedScreen() {
   const [resumeState, setResumeState] = useState<ResumeBrowsingState | null>(null);
   const [showResumeCard, setShowResumeCard] = useState(false);
 
+  // Collections modal states
+  const [saveModalVisible, setSaveModalVisible] = useState(false);
+  const [selectedColId, setSelectedColId] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState('');
+  const [creatingNewCollection, setCreatingNewCollection] = useState(false);
+  const [newColName, setNewColName] = useState('');
+  const [newColDesc, setNewColDesc] = useState('');
+
   // Geographic Locality States
   const [snapshot, setSnapshot] = useState<NeighborhoodSnapshot | null>(null);
   const [activeLocationTab, setActiveLocationTab] = useState('Snapshot');
   const [loadingSnapshot, setLoadingSnapshot] = useState(false);
+
+  const handleShareProperty = async (p: PropertyListing) => {
+    try {
+      await Share.share({
+        message: `Check out this amazing walkthrough: ${p.title} in ${p.locality || p.city} for ${formatCurrency(p.price)}/mo!`,
+        url: `https://60haus.app/property/${p.id}`,
+      });
+      analyticsService.trackScreenView('property_detail');
+    } catch {
+      console.warn('Share failed');
+    }
+  };
+
+  const handleSavePropertyToCollection = (p: PropertyListing) => {
+    if (isGuest || !p) {
+      Alert.alert(
+        'Authentication Required',
+        'Please sign in or create an account to save properties.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => router.push('/login' as any) },
+        ]
+      );
+      return;
+    }
+
+    const alreadySaved = savedPropertyIds.has(p.id);
+    if (alreadySaved) {
+      Alert.alert(
+        'Unsave Property',
+        'This property is already bookmarked. Manage collections or unsave?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Manage Collections',
+            onPress: () => {
+              if (collections.length === 0) {
+                setCreatingNewCollection(true);
+              } else {
+                setCreatingNewCollection(false);
+                setSelectedColId(collections[0].id);
+              }
+              setSaveModalVisible(true);
+            },
+          },
+          {
+            text: 'Unsave/Remove',
+            style: 'destructive',
+            onPress: () => {
+              toggleSave(p.id);
+              showToast('Removed from saved homes');
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    if (collections.length === 0) {
+      setCreatingNewCollection(true);
+    } else {
+      setCreatingNewCollection(false);
+      setSelectedColId(collections[0].id);
+    }
+    setSaveModalVisible(true);
+  };
+
+  const handleComparePropertyToggle = (p: PropertyListing) => {
+    toggleCompare(p.id);
+    const added = !compareQueue.includes(p.id);
+    showToast(added ? 'Added to comparison queue' : 'Removed from comparison queue');
+  };
+
+  const handleSaveToCollectionSubmit = async () => {
+    if (!selectedProperty) return;
+    const pId = selectedProperty.id;
+
+    try {
+      const alreadySaved = savedPropertyIds.has(pId);
+      if (!alreadySaved) {
+        toggleSave(pId);
+      }
+
+      if (creatingNewCollection) {
+        if (!newColName.trim()) {
+          showToast('Collection name is required.');
+          return;
+        }
+        const col = await createCollection(newColName.trim(), newColDesc.trim());
+        analyticsService.trackCollectionCreated(col.id, col.name);
+        await addPropertyToCollection(col.id, pId, noteText.trim());
+        analyticsService.trackPropertyAddedToCollection(pId, col.id);
+        
+        setNewColName('');
+        setNewColDesc('');
+      } else {
+        if (!selectedColId) {
+          showToast('Please select a collection.');
+          return;
+        }
+        await addPropertyToCollection(selectedColId, pId, noteText.trim());
+        analyticsService.trackPropertyAddedToCollection(pId, selectedColId);
+      }
+
+      setNoteText('');
+      setSaveModalVisible(false);
+    } catch {
+      showToast('Failed to save to collection.');
+    }
+  };
 
   useEffect(() => {
     if (selectedProperty) {
@@ -108,8 +235,8 @@ export default function FeedScreen() {
         try {
           const snap = await locationDomain.getNeighborhoodSnapshot(selectedProperty, properties);
           setSnapshot(snap);
-        } catch (e) {
-          console.warn('Failed to load neighborhood details:', e);
+        } catch {
+          console.warn('Failed to load neighborhood details');
         } finally {
           setLoadingSnapshot(false);
         }
@@ -139,8 +266,8 @@ export default function FeedScreen() {
             setShowResumeCard(true);
           }
         }
-      } catch (e) {
-        console.warn('Failed to load resume state:', e);
+      } catch {
+        console.warn('Failed to load resume state');
       }
     };
     checkResumeProgress();
@@ -873,6 +1000,50 @@ export default function FeedScreen() {
                 </View>
               )}
 
+              {/* Sprint 15 Action Buttons Row */}
+              <View style={styles.sheetActionsRow}>
+                <TouchableOpacity
+                  onPress={() => handleShareProperty(selectedProperty)}
+                  style={styles.sheetActionBtn}
+                  accessibilityLabel="Share listing"
+                  accessibilityRole="button"
+                >
+                  <Share2 size={16} color={Theme.colors.textPrimary} />
+                  <Text style={styles.sheetActionBtnText}>Share</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => handleSavePropertyToCollection(selectedProperty)}
+                  style={styles.sheetActionBtn}
+                  accessibilityLabel="Save listing to collection"
+                  accessibilityRole="button"
+                >
+                  <Heart
+                    size={16}
+                    color={savedPropertyIds.has(selectedProperty.id) ? Theme.colors.primary : Theme.colors.textPrimary}
+                    fill={savedPropertyIds.has(selectedProperty.id) ? Theme.colors.primary : 'transparent'}
+                  />
+                  <Text style={styles.sheetActionBtnText}>
+                    {savedPropertyIds.has(selectedProperty.id) ? 'Saved' : 'Save'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => handleComparePropertyToggle(selectedProperty)}
+                  style={styles.sheetActionBtn}
+                  accessibilityLabel="Toggle property comparison"
+                  accessibilityRole="button"
+                >
+                  <GitCompare
+                    size={16}
+                    color={compareQueue.includes(selectedProperty.id) ? Theme.colors.primary : Theme.colors.textPrimary}
+                  />
+                  <Text style={styles.sheetActionBtnText}>
+                    {compareQueue.includes(selectedProperty.id) ? 'Comparing' : 'Compare'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               {/* Action Button */}
               <Button
                 variant="primary"
@@ -885,6 +1056,141 @@ export default function FeedScreen() {
           </ScrollView>
         )}
       </BottomSheet>
+
+      {/* Sprint 15 - Floating Comparison Banner */}
+      {compareQueue.length > 0 && (
+        <View style={styles.compareBanner} accessibilityRole="none">
+          <View style={styles.compareBannerLeft}>
+            <GitCompare size={18} color={Theme.colors.primary} />
+            <Text style={styles.compareBannerText}>
+              Comparing {compareQueue.length} {compareQueue.length === 1 ? 'property' : 'properties'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.compareBannerBtn}
+            onPress={() => router.push('/compare' as any)}
+            accessibilityLabel="Open compare screen button"
+            accessibilityRole="button"
+          >
+            <Text style={styles.compareBannerBtnText}>Compare Now</Text>
+            <ArrowRight size={14} color={Theme.colors.background} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Modal - Save to Collection Picker (Feed version) */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={saveModalVisible}
+        onRequestClose={() => setSaveModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent} accessibilityViewIsModal={true}>
+            <Text style={styles.modalTitle}>
+              {creatingNewCollection ? 'Create Collection & Save' : 'Save to Collection'}
+            </Text>
+
+            {creatingNewCollection ? (
+              <View style={{ gap: Theme.spacing.md }}>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="Collection Name (e.g. Dream Homes)"
+                  placeholderTextColor={Theme.colors.textSecondary}
+                  value={newColName}
+                  onChangeText={setNewColName}
+                  maxLength={30}
+                  accessibilityLabel="Collection Name Input"
+                />
+                <TextInput
+                  style={[styles.modalInput, styles.modalInputDesc]}
+                  placeholder="Description (Optional)"
+                  placeholderTextColor={Theme.colors.textSecondary}
+                  value={newColDesc}
+                  onChangeText={setNewColDesc}
+                  multiline
+                  maxLength={100}
+                  accessibilityLabel="Collection Description Input"
+                />
+                {collections.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setCreatingNewCollection(false)}
+                    accessibilityLabel="Choose existing collection toggle"
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.toggleCreateText}>Choose existing collection</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : (
+              <View style={{ gap: Theme.spacing.md }}>
+                <Text style={styles.modalSubtitle}>Select Target Collection:</Text>
+                <ScrollView style={styles.collectionsSelectorList} nestedScrollEnabled>
+                  {collections.map((col) => (
+                    <TouchableOpacity
+                      key={col.id}
+                      style={[
+                        styles.collectionSelectItem,
+                        selectedColId === col.id && styles.collectionSelectItemActive,
+                      ]}
+                      onPress={() => setSelectedColId(col.id)}
+                      accessibilityLabel={`Select collection ${col.name}`}
+                      accessibilityRole="button"
+                    >
+                      <Text
+                        style={[
+                          styles.collectionSelectText,
+                          selectedColId === col.id && styles.collectionSelectTextActive,
+                        ]}
+                      >
+                        {col.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity
+                  onPress={() => setCreatingNewCollection(true)}
+                  accessibilityLabel="Create custom collection toggle"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.toggleCreateText}>+ Create New Collection</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Note text input */}
+            <TextInput
+              style={styles.modalInputNote}
+              placeholder="Add personal note (e.g. kitchen size, view)..."
+              placeholderTextColor={Theme.colors.textSecondary}
+              value={noteText}
+              onChangeText={setNoteText}
+              multiline
+              maxLength={200}
+              accessibilityLabel="Personal Listing Note"
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setSaveModalVisible(false)}
+                accessibilityLabel="Cancel saving listing"
+                accessibilityRole="button"
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSaveBtn}
+                onPress={handleSaveToCollectionSubmit}
+                accessibilityLabel="Confirm save to collection"
+                accessibilityRole="button"
+              >
+                <Text style={styles.modalSaveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Listing Report Bottom Sheet */}
       <BottomSheet
@@ -1599,5 +1905,183 @@ const styles = StyleSheet.create({
     fontSize: Theme.typography.sizes.xs,
     marginLeft: 3,
     fontFamily: Theme.typography.fontFamilySemiBold,
+  },
+  sheetActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: Theme.spacing.md,
+    marginTop: Theme.spacing.md,
+    marginBottom: Theme.spacing.xs,
+  },
+  sheetActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Theme.colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    borderRadius: 8,
+    paddingVertical: Theme.spacing.sm,
+    gap: 6,
+  },
+  sheetActionBtnText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilySemiBold,
+    color: Theme.colors.textPrimary,
+  },
+  compareBanner: {
+    position: 'absolute',
+    bottom: Theme.floatingDock.height + Theme.spacing.md,
+    left: Theme.spacing.lg,
+    right: Theme.spacing.lg,
+    backgroundColor: 'rgba(21, 21, 24, 0.95)',
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(223, 185, 120, 0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingLeft: Theme.spacing.lg,
+    paddingRight: 6,
+    paddingVertical: 6,
+    zIndex: 999,
+  },
+  compareBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Theme.spacing.xs,
+  },
+  compareBannerText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilySemiBold,
+    color: Theme.colors.textPrimary,
+  },
+  compareBannerBtn: {
+    backgroundColor: Theme.colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Theme.spacing.md,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 4,
+  },
+  compareBannerBtnText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.background,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Theme.spacing.xl,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 320,
+    backgroundColor: Theme.colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    padding: Theme.spacing.xl,
+    gap: Theme.spacing.md,
+  },
+  modalTitle: {
+    fontSize: Theme.typography.sizes.md,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
+    color: Theme.colors.textPrimary,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.textSecondary,
+  },
+  modalInput: {
+    backgroundColor: Theme.colors.background,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    borderRadius: 8,
+    paddingHorizontal: Theme.spacing.md,
+    paddingVertical: Theme.spacing.sm,
+    color: Theme.colors.textPrimary,
+    fontSize: Theme.typography.sizes.sm,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  modalInputDesc: {
+    height: 60,
+    textAlignVertical: 'top',
+  },
+  modalInputNote: {
+    backgroundColor: Theme.colors.background,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    borderRadius: 8,
+    paddingHorizontal: Theme.spacing.md,
+    paddingVertical: Theme.spacing.sm,
+    color: Theme.colors.textPrimary,
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamily,
+    height: 50,
+    textAlignVertical: 'top',
+  },
+  toggleCreateText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilySemiBold,
+    color: Theme.colors.primary,
+    textAlign: 'center',
+  },
+  collectionsSelectorList: {
+    maxHeight: 120,
+  },
+  collectionSelectItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.border,
+  },
+  collectionSelectItemActive: {
+    backgroundColor: '#1E1E22',
+  },
+  collectionSelectText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamily,
+    color: Theme.colors.textSecondary,
+  },
+  collectionSelectTextActive: {
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.primary,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: Theme.spacing.md,
+    marginTop: Theme.spacing.sm,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: Theme.spacing.sm,
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+  },
+  modalCancelText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilySemiBold,
+    color: Theme.colors.textSecondary,
+  },
+  modalSaveBtn: {
+    flex: 1,
+    backgroundColor: Theme.colors.primary,
+    paddingVertical: Theme.spacing.sm,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  modalSaveText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.background,
   },
 });

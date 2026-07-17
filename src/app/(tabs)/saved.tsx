@@ -1,85 +1,205 @@
-import React, { useCallback, useState } from 'react';
-import { StyleSheet, Text, View, FlatList, TouchableOpacity } from 'react-native';
+import React, { useCallback, useState, useContext } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  FlatList,
+  TouchableOpacity,
+  ScrollView,
+  TextInput,
+  Modal,
+  Switch,
+  Alert,
+} from 'react-native';
 import { Image } from 'expo-image';
 import { ScreenContainer } from '../../components/ScreenContainer';
-import { Card } from '../../components/Card';
 import { FeedbackState } from '../../components/FeedbackState';
-import { Skeleton } from '../../components/Skeleton';
 import { Theme } from '../../theme';
-import { useProperties } from '../../hooks/useProperties';
+import { PropertyContext } from '../../context/PropertyContext';
 import { useAuth } from '../../hooks/useAuth';
-import { useRouter } from 'expo-router';
-import { formatCurrency } from '../../utils';
-import { Trash2 } from 'lucide-react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
+import {
+  Trash2,
+  FolderPlus,
+  Pin,
+  Bell,
+  Search,
+  History,
+  ChevronRight,
+  BookOpen,
+} from 'lucide-react-native';
+import { savedSearchService } from '../../services/savedSearchService';
+import { alertService } from '../../services/alertService';
+import { historyService } from '../../services/historyService';
+import { SavedSearch, PropertyListing } from '../../types';
+import { useFeedback } from '../../context/FeedbackContext';
+import { analyticsService } from '../../services/analyticsService';
 
 export default function SavedScreen() {
   const router = useRouter();
-  const { savedProperties, toggleSave, loading, fetchFeed } = useProperties();
+  const context = useContext(PropertyContext);
   const { user, isGuest } = useAuth();
-  const [localLoading, setLocalLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const { showToast } = useFeedback();
 
-  const handleRetry = async () => {
-    setError(false);
-    setLocalLoading(true);
+  const [activeTab, setActiveTab] = useState<'collections' | 'searches' | 'alerts'>('collections');
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [recentViews, setRecentViews] = useState<PropertyListing[]>([]);
+
+  // Create Collection Modal States
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [newColName, setNewColName] = useState('');
+  const [newColDesc, setNewColDesc] = useState('');
+
+  // Fallbacks if context is unmounted
+  const collections = context?.collections || [];
+  const fetchCollections = context?.fetchCollections || (() => Promise.resolve());
+  const createCollection = context?.createCollection || (() => Promise.resolve({} as any));
+  const deleteCollection = context?.deleteCollection || (() => Promise.resolve());
+  const setFilters = context?.setFilters || (() => {});
+
+  // Load all components data
+  const loadPersonalData = useCallback(async () => {
+    if (isGuest || !user) return;
     try {
-      await fetchFeed();
+      // 1. Refresh collections
+      await fetchCollections();
+
+      // 2. Fetch saved searches
+      const searches = await savedSearchService.getSavedSearches(user.id);
+      setSavedSearches(searches);
+
+      // 3. Fetch alerts
+      const alertSubs = await alertService.getAlerts(user.id);
+      setAlerts(alertSubs);
+
+      // 4. Fetch history
+      const history = await historyService.getRecentViews(user.id);
+      setRecentViews(history);
     } catch {
-      setError(true);
-    } finally {
-      setLocalLoading(false);
+      console.error('Failed to load personal metadata');
+    }
+  }, [user, isGuest, fetchCollections]);
+
+  // Trigger load when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadPersonalData();
+    }, [loadPersonalData]),
+  );
+
+  const handleCreateCollection = async () => {
+    if (!newColName.trim()) {
+      showToast('Collection name is required.');
+      return;
+    }
+    try {
+      const col = await createCollection(newColName.trim(), newColDesc.trim());
+      analyticsService.trackCollectionCreated(col.id, col.name);
+      setNewColName('');
+      setNewColDesc('');
+      setCreateModalVisible(false);
+      showToast('Collection created successfully.');
+    } catch {
+      showToast('Failed to create collection.');
     }
   };
 
-  const renderItem = useCallback(({ item }: { item: typeof savedProperties[0] }) => (
-    <Card elevated={false} style={styles.card}>
-      <Image
-        source={{ uri: item.thumbnailUrl }}
-        style={styles.cardImage}
-        contentFit="cover"
-      />
-      <View style={styles.cardDetails}>
-        <View style={styles.row}>
-          <Text style={styles.price}>{formatCurrency(item.price)}/mo</Text>
-          <TouchableOpacity
-            onPress={() => toggleSave(item.id)}
-            style={styles.deleteBtn}
-          >
-            <Trash2 size={18} color={Theme.colors.danger} />
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.location}>{item.address}, {item.city}</Text>
-        
-        <View style={styles.metaRow}>
-          <Text style={styles.metaText}>
-            {item.bedrooms} BHK  •  {item.bathrooms} Bath  •  {item.furnishing.replace('-', ' ')}
-          </Text>
-        </View>
-      </View>
-    </Card>
-  ), [toggleSave]);
 
-  const renderSkeletons = () => (
-    <View style={styles.skeletonList}>
-      {[1, 2, 3].map((key) => (
-        <Card key={key} elevated={false} style={styles.card}>
-          <Skeleton height={160} width="100%" />
-          <View style={styles.cardDetails}>
-            <View style={styles.row}>
-              <Skeleton height={24} width="40%" />
-              <Skeleton height={24} width={24} />
-            </View>
-            <Skeleton height={20} width="80%" style={{ marginTop: 8 }} />
-            <Skeleton height={16} width="60%" style={{ marginTop: 4 }} />
-            <View style={[styles.metaRow, { borderTopWidth: 0 }]}>
-              <Skeleton height={14} width="50%" />
-            </View>
-          </View>
-        </Card>
-      ))}
-    </View>
-  );
+
+  // Run a saved search filters preset
+  const handleExecuteSearch = (search: SavedSearch) => {
+    setFilters(search.filters);
+    analyticsService.trackSavedSearchExecuted(search.name || '');
+    showToast(`Running saved preset: ${search.name}`);
+    router.replace('/(tabs)' as any); // Navigate to Feed with filters pre-filled
+  };
+
+  const handleTogglePinSearch = async (search: SavedSearch) => {
+    try {
+      const nextPinState = !search.isPinned;
+      await savedSearchService.togglePinSavedSearch(search.id, nextPinState);
+      setSavedSearches((prev) =>
+        prev
+          .map((s) => (s.id === search.id ? { ...s, isPinned: nextPinState } : s))
+          .sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)),
+      );
+      showToast(nextPinState ? 'Search pinned to top' : 'Search unpinned');
+    } catch {
+      showToast('Failed to update pinned state');
+    }
+  };
+
+  const handleDeleteSearch = (id: string) => {
+    Alert.alert('Delete Saved Search', 'Remove this search preset?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await savedSearchService.deleteSavedSearch(id);
+            setSavedSearches((prev) => prev.filter((s) => s.id !== id));
+            showToast('Search preset removed');
+          } catch {
+            showToast('Failed to delete search');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleToggleAlert = async (alertId: string, currentStatus: boolean) => {
+    try {
+      await alertService.toggleAlert(alertId, !currentStatus);
+      setAlerts((prev) =>
+        prev.map((a) => (a.id === alertId ? { ...a, isActive: !currentStatus } : a)),
+      );
+      showToast(!currentStatus ? 'Alerts activated' : 'Alerts muted');
+    } catch {
+      showToast('Failed to update alert state');
+    }
+  };
+
+  const handleDeleteAlert = (alertId: string) => {
+    Alert.alert('Delete Alert', 'Are you sure you want to cancel this search alert?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Cancel Alert',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await alertService.deleteAlert(alertId);
+            analyticsService.trackAlertDeleted(alertId);
+            setAlerts((prev) => prev.filter((a) => a.id !== alertId));
+            showToast('Alert canceled');
+          } catch {
+            showToast('Failed to cancel alert');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleClearHistory = async () => {
+    if (!user) return;
+    Alert.alert('Clear History', 'Wipe your recently viewed properties?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Clear All',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await historyService.clearHistory(user.id);
+            setRecentViews([]);
+            showToast('Browsing history cleared');
+          } catch {
+            showToast('Failed to clear history');
+          }
+        },
+      },
+    ]);
+  };
 
   if (isGuest || !user) {
     return (
@@ -93,35 +213,356 @@ export default function SavedScreen() {
     );
   }
 
+  // 1. Render Collections Sub-tab Content
+  const renderCollections = () => {
+    if (collections.length === 0) {
+      return (
+        <View style={styles.emptyTabState}>
+          <BookOpen size={36} color={Theme.colors.textSecondary} />
+          <Text style={styles.emptyTextTitle}>Create Custom Collections</Text>
+          <Text style={styles.emptyTextSub}>
+            Organize listing details into targeted groupings (e.g. Dream Homes, Office, Beach Villas).
+          </Text>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => setCreateModalVisible(true)}
+            accessibilityLabel="Create first collection"
+            accessibilityRole="button"
+          >
+            <FolderPlus size={16} color={Theme.colors.background} />
+            <Text style={styles.actionBtnText}>Create Collection</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.tabContentBlock}>
+        <View style={styles.tabHeaderRow}>
+          <Text style={styles.countLabel}>{collections.length} Collections</Text>
+          <TouchableOpacity
+            style={styles.addBtnSmall}
+            onPress={() => setCreateModalVisible(true)}
+            accessibilityLabel="Add new collection"
+            accessibilityRole="button"
+          >
+            <FolderPlus size={14} color={Theme.colors.primary} />
+            <Text style={styles.addBtnSmallText}>New Collection</Text>
+          </TouchableOpacity>
+        </View>
+
+        <FlatList
+          data={collections}
+          keyExtractor={(item) => item.id}
+          scrollEnabled={false} // Managed by outer ScrollView
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.collectionCard}
+              onPress={() => router.push(`/collection/${item.id}` as any)}
+              accessibilityLabel={`Open collection ${item.name}`}
+              accessibilityRole="button"
+            >
+              {item.coverImageUrl ? (
+                <Image source={{ uri: item.coverImageUrl }} style={styles.colCover} contentFit="cover" />
+              ) : (
+                <View style={styles.colCoverPlaceholder}>
+                  <BookOpen size={24} color={Theme.colors.border} />
+                </View>
+              )}
+              <View style={styles.colDetails}>
+                <Text style={styles.colName}>{item.name}</Text>
+                {item.description ? (
+                  <Text style={styles.colDesc} numberOfLines={1}>
+                    {item.description}
+                  </Text>
+                ) : null}
+                <Text style={styles.colCount}>
+                  {item.propertiesCount || 0} listings saved
+                </Text>
+              </View>
+              <ChevronRight size={18} color={Theme.colors.border} />
+            </TouchableOpacity>
+          )}
+        />
+      </View>
+    );
+  };
+
+  // 2. Render Saved Search Presets Sub-tab Content
+  const renderSearches = () => {
+    if (savedSearches.length === 0) {
+      return (
+        <View style={styles.emptyTabState}>
+          <Search size={36} color={Theme.colors.textSecondary} />
+          <Text style={styles.emptyTextTitle}>No Saved Searches</Text>
+          <Text style={styles.emptyTextSub}>
+            Save custom filters on the Feed search overlay to quickly re-run search metrics later.
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.tabContentBlock}>
+        <Text style={styles.countLabel}>{savedSearches.length} Search Presets</Text>
+        <FlatList
+          data={savedSearches}
+          keyExtractor={(item) => item.id}
+          scrollEnabled={false}
+          renderItem={({ item }) => {
+            const f = item.filters;
+            const filterSummary = `${f.city || 'Any City'} • ${f.bedrooms ? `${f.bedrooms} BHK` : 'Any BHK'} • ${
+              f.listingType === 'buy' ? 'Buy' : 'Rent'
+            }`;
+
+            return (
+              <View style={styles.searchItem}>
+                <TouchableOpacity
+                  style={styles.searchDetails}
+                  onPress={() => handleExecuteSearch(item)}
+                  accessibilityLabel={`Execute search ${item.name}`}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.searchName}>{item.name}</Text>
+                  <Text style={styles.searchFiltersSummary}>{filterSummary}</Text>
+                </TouchableOpacity>
+
+                <View style={styles.searchActions}>
+                  <TouchableOpacity
+                    onPress={() => handleTogglePinSearch(item)}
+                    style={styles.searchActionBtn}
+                    accessibilityLabel="Toggle Pin search"
+                    accessibilityRole="button"
+                  >
+                    <Pin size={16} color={item.isPinned ? Theme.colors.primary : Theme.colors.border} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleDeleteSearch(item.id)}
+                    style={styles.searchActionBtn}
+                    accessibilityLabel="Delete search"
+                    accessibilityRole="button"
+                  >
+                    <Trash2 size={16} color={Theme.colors.danger} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          }}
+        />
+      </View>
+    );
+  };
+
+  // 3. Render Alerts Sub-tab Content
+  const renderAlerts = () => {
+    if (alerts.length === 0) {
+      return (
+        <View style={styles.emptyTabState}>
+          <Bell size={36} color={Theme.colors.textSecondary} />
+          <Text style={styles.emptyTextTitle}>No Active Alerts</Text>
+          <Text style={styles.emptyTextSub}>
+            Create search alerts to stay updated on price drops or fresh matching properties.
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.tabContentBlock}>
+        <Text style={styles.countLabel}>{alerts.length} Alert Subscriptions</Text>
+        <FlatList
+          data={alerts}
+          keyExtractor={(item) => item.id}
+          scrollEnabled={false}
+          renderItem={({ item }) => {
+            let label = 'Listing Alerts';
+            if (item.alertType === 'price_drop') label = 'Price Drop alert';
+            else if (item.alertType === 'new_matching_property') label = 'Matching Search alert';
+            else if (item.alertType === 'verified_owner') label = 'Verified Owner Alert';
+
+            return (
+              <View style={styles.alertItem}>
+                <View style={styles.alertMeta}>
+                  <Text style={styles.alertTitle}>{label}</Text>
+                  <Text style={styles.alertSearchName} numberOfLines={1}>
+                    For: {item.searchName || 'General saved search'}
+                  </Text>
+                </View>
+                <View style={styles.alertActions}>
+                  <Switch
+                    value={item.isActive}
+                    onValueChange={() => handleToggleAlert(item.id, item.isActive)}
+                    trackColor={{ false: '#2C2C30', true: Theme.colors.primary }}
+                    thumbColor={item.isActive ? '#FFFFFF' : '#8E8E93'}
+                    accessibilityLabel="Toggle Alert state"
+                  />
+                  <TouchableOpacity
+                    onPress={() => handleDeleteAlert(item.id)}
+                    style={styles.alertDeleteBtn}
+                    accessibilityLabel="Delete Alert"
+                    accessibilityRole="button"
+                  >
+                    <Trash2 size={16} color={Theme.colors.danger} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          }}
+        />
+      </View>
+    );
+  };
+
   return (
     <ScreenContainer style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Saved Homes</Text>
-        <Text style={styles.headerSub}>
-          {loading || localLoading ? 'Loading saved items...' : `${savedProperties.length} properties bookmarked`}
-        </Text>
-      </View>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {/* Header Title */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Personal Hub</Text>
+          <Text style={styles.headerSub}>Manage your collections, searches, and alert triggers.</Text>
+        </View>
 
-      {error ? (
-        <FeedbackState type="error" onRetry={handleRetry} />
-      ) : loading || localLoading ? (
-        renderSkeletons()
-      ) : savedProperties.length > 0 ? (
-        <FlatList
-          data={savedProperties}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
-      ) : (
-        <FeedbackState
-          type="empty-saved"
-          title="You haven't saved any homes yet."
-          onRetry={() => router.replace('/(tabs)' as any)}
-          actionText="Browse Properties"
-        />
-      )}
+        {/* horizontal Sub-tabs */}
+        <View style={styles.tabsRow}>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'collections' && styles.tabActiveButton]}
+            onPress={() => setActiveTab('collections')}
+            accessibilityLabel="Collections tab"
+            accessibilityRole="tab"
+          >
+            <Text style={[styles.tabButtonText, activeTab === 'collections' && styles.tabActiveButtonText]}>
+              Collections
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'searches' && styles.tabActiveButton]}
+            onPress={() => setActiveTab('searches')}
+            accessibilityLabel="Searches tab"
+            accessibilityRole="tab"
+          >
+            <Text style={[styles.tabButtonText, activeTab === 'searches' && styles.tabActiveButtonText]}>
+              Saved Searches
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'alerts' && styles.tabActiveButton]}
+            onPress={() => setActiveTab('alerts')}
+            accessibilityLabel="Alerts tab"
+            accessibilityRole="tab"
+          >
+            <Text style={[styles.tabButtonText, activeTab === 'alerts' && styles.tabActiveButtonText]}>
+              Alerts
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Tab content body */}
+        <View style={styles.tabContentContainer}>
+          {activeTab === 'collections' && renderCollections()}
+          {activeTab === 'searches' && renderSearches()}
+          {activeTab === 'alerts' && renderAlerts()}
+        </View>
+
+        {/* Horizontal Recently Viewed Carousel ("Continue Exploring") */}
+        {recentViews.length > 0 ? (
+          <View style={styles.historySection}>
+            <View style={styles.historyHeader}>
+              <View style={styles.historyTitleRow}>
+                <History size={16} color={Theme.colors.primary} />
+                <Text style={styles.historyTitle}>Continue Exploring</Text>
+              </View>
+              <TouchableOpacity
+                onPress={handleClearHistory}
+                accessibilityLabel="Clear history list"
+                accessibilityRole="button"
+              >
+                <Text style={styles.clearHistoryText}>Clear History</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.historyCarousel}
+            >
+              {recentViews.map((p) => (
+                <TouchableOpacity
+                  key={p.id}
+                  style={styles.historyCard}
+                  onPress={() => router.push(`/property/${p.id}` as any)}
+                  accessibilityLabel={`Resume exploring ${p.title}`}
+                  accessibilityRole="button"
+                >
+                  <Image source={{ uri: p.thumbnailUrl }} style={styles.historyThumb} contentFit="cover" />
+                  <Text style={styles.historyCardTitle} numberOfLines={1}>
+                    {p.title}
+                  </Text>
+                  <Text style={styles.historyCardLoc} numberOfLines={1}>
+                    {p.locality || p.city}
+                  </Text>
+                  <Text style={styles.historyCardPrice}>
+                    ${p.price.toLocaleString()}/mo
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
+      </ScrollView>
+
+      {/* Modal - Create Collection Dialog */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={createModalVisible}
+        onRequestClose={() => setCreateModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent} accessibilityViewIsModal={true}>
+            <Text style={styles.modalTitle}>New Collection</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Name (e.g. Weekend Villas)"
+              placeholderTextColor={Theme.colors.textSecondary}
+              value={newColName}
+              onChangeText={setNewColName}
+              maxLength={30}
+              accessibilityLabel="Collection Name"
+            />
+            <TextInput
+              style={[styles.modalInput, styles.modalInputDesc]}
+              placeholder="Description (Optional)"
+              placeholderTextColor={Theme.colors.textSecondary}
+              value={newColDesc}
+              onChangeText={setNewColDesc}
+              multiline
+              numberOfLines={3}
+              maxLength={150}
+              accessibilityLabel="Collection Description"
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setCreateModalVisible(false)}
+                accessibilityLabel="Cancel collection creation"
+                accessibilityRole="button"
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSaveBtn}
+                onPress={handleCreateCollection}
+                accessibilityLabel="Create collection save"
+                accessibilityRole="button"
+              >
+                <Text style={styles.modalSaveText}>Create</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -130,6 +571,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Theme.colors.background,
+  },
+  scrollContent: {
+    paddingBottom: Theme.floatingDock.height + Theme.spacing.xxxl,
   },
   header: {
     paddingHorizontal: Theme.spacing.xl,
@@ -146,66 +590,343 @@ const styles = StyleSheet.create({
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
     marginTop: Theme.spacing.xs,
+    lineHeight: Theme.typography.lineHeights.sm,
   },
-  listContent: {
-    paddingHorizontal: Theme.spacing.xl,
-    paddingBottom: Theme.floatingDock.height + Theme.spacing.xxxl,
-    gap: Theme.spacing.lg,
-  },
-  skeletonList: {
-    paddingHorizontal: Theme.spacing.xl,
-    gap: Theme.spacing.lg,
-  },
-  card: {
-    padding: 0,
-    borderRadius: Theme.borderRadius.lg,
-    overflow: 'hidden',
+  tabsRow: {
+    flexDirection: 'row',
+    marginHorizontal: Theme.spacing.xl,
     backgroundColor: Theme.colors.surface,
-    borderColor: Theme.colors.border,
+    borderRadius: 8,
+    padding: 3,
     borderWidth: 1,
+    borderColor: Theme.colors.border,
   },
-  cardImage: {
-    height: 160,
-    width: '100%',
+  tabButton: {
+    flex: 1,
+    paddingVertical: Theme.spacing.sm,
+    alignItems: 'center',
+    borderRadius: 6,
   },
-  cardDetails: {
-    padding: Theme.spacing.lg,
-    gap: Theme.spacing.xs,
+  tabActiveButton: {
+    backgroundColor: '#1E1E22',
   },
-  row: {
+  tabButtonText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyMedium,
+    color: Theme.colors.textSecondary,
+  },
+  tabActiveButtonText: {
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.primary,
+  },
+  tabContentContainer: {
+    paddingHorizontal: Theme.spacing.xl,
+    marginTop: Theme.spacing.lg,
+  },
+  tabContentBlock: {
+    flexDirection: 'column',
+  },
+  tabHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: Theme.spacing.md,
   },
-  price: {
-    fontSize: Theme.typography.sizes.xl,
-    color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamilyBold,
-  },
-  deleteBtn: {
-    padding: Theme.spacing.xs,
-  },
-  title: {
-    fontSize: Theme.typography.sizes.lg,
-    color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamilyEditorialBold,
-    marginTop: Theme.spacing.xs,
-  },
-  location: {
-    fontSize: Theme.typography.sizes.sm,
+  countLabel: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyMedium,
     color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
+    marginBottom: Theme.spacing.sm,
   },
-  metaRow: {
+  addBtnSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  addBtnSmallText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.primary,
+  },
+  emptyTabState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Theme.spacing.xxxl,
+    paddingHorizontal: Theme.spacing.xl,
+  },
+  emptyTextTitle: {
+    fontSize: Theme.typography.sizes.md,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
+    color: Theme.colors.textPrimary,
     marginTop: Theme.spacing.md,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  emptyTextSub: {
+    fontSize: Theme.typography.sizes.sm,
+    fontFamily: Theme.typography.fontFamily,
+    color: Theme.colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: Theme.typography.lineHeights.sm,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.primary,
+    paddingHorizontal: Theme.spacing.lg,
+    paddingVertical: Theme.spacing.sm,
+    borderRadius: 8,
+    gap: Theme.spacing.xs,
+    marginTop: Theme.spacing.lg,
+  },
+  actionBtnText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.background,
+  },
+  collectionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    padding: Theme.spacing.md,
+    marginBottom: Theme.spacing.md,
+  },
+  colCover: {
+    width: 60,
+    height: 60,
+    borderRadius: 6,
+    backgroundColor: '#1E1E22',
+  },
+  colCoverPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 6,
+    backgroundColor: '#151518',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+  },
+  colDetails: {
+    flex: 1,
+    marginLeft: Theme.spacing.md,
+  },
+  colName: {
+    fontSize: Theme.typography.sizes.md,
+    fontFamily: Theme.typography.fontFamilySemiBold,
+    color: Theme.colors.textPrimary,
+  },
+  colDesc: {
+    fontSize: Theme.typography.sizes.xxs,
+    fontFamily: Theme.typography.fontFamily,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  colCount: {
+    fontSize: Theme.typography.sizes.xxs,
+    fontFamily: Theme.typography.fontFamilyMedium,
+    color: Theme.colors.primary,
+    marginTop: 4,
+  },
+  searchItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Theme.colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    padding: Theme.spacing.md,
+    marginBottom: Theme.spacing.sm,
+  },
+  searchDetails: {
+    flex: 1,
+  },
+  searchName: {
+    fontSize: Theme.typography.sizes.sm,
+    fontFamily: Theme.typography.fontFamilySemiBold,
+    color: Theme.colors.textPrimary,
+  },
+  searchFiltersSummary: {
+    fontSize: Theme.typography.sizes.xxs,
+    fontFamily: Theme.typography.fontFamily,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  searchActions: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  searchActionBtn: {
+    padding: 6,
+  },
+  alertItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Theme.colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    padding: Theme.spacing.md,
+    marginBottom: Theme.spacing.sm,
+  },
+  alertMeta: {
+    flex: 1,
+  },
+  alertTitle: {
+    fontSize: Theme.typography.sizes.sm,
+    fontFamily: Theme.typography.fontFamilySemiBold,
+    color: Theme.colors.textPrimary,
+  },
+  alertSearchName: {
+    fontSize: Theme.typography.sizes.xxs,
+    fontFamily: Theme.typography.fontFamily,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  alertActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  alertDeleteBtn: {
+    padding: 6,
+  },
+  historySection: {
+    marginTop: Theme.spacing.xxxl,
+    paddingTop: Theme.spacing.lg,
     borderTopWidth: 1,
     borderTopColor: Theme.colors.border,
-    paddingTop: Theme.spacing.sm,
   },
-  metaText: {
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Theme.spacing.xl,
+    marginBottom: Theme.spacing.md,
+  },
+  historyTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  historyTitle: {
+    fontSize: Theme.typography.sizes.md,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
+    color: Theme.colors.textPrimary,
+  },
+  clearHistoryText: {
     fontSize: Theme.typography.sizes.xs,
-    color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamilyMedium,
+    color: Theme.colors.danger,
+  },
+  historyCarousel: {
+    paddingHorizontal: Theme.spacing.xl,
+    gap: Theme.spacing.md,
+  },
+  historyCard: {
+    width: 130,
+    backgroundColor: Theme.colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    padding: Theme.spacing.sm,
+  },
+  historyThumb: {
+    width: '100%',
+    height: 80,
+    borderRadius: 6,
+    backgroundColor: '#1E1E22',
+  },
+  historyCardTitle: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilySemiBold,
+    color: Theme.colors.textPrimary,
+    marginTop: 6,
+  },
+  historyCardLoc: {
+    fontSize: Theme.typography.sizes.xxs,
     fontFamily: Theme.typography.fontFamily,
-    textTransform: 'capitalize',
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  historyCardPrice: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.primary,
+    marginTop: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Theme.spacing.xl,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 320,
+    backgroundColor: Theme.colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    padding: Theme.spacing.xl,
+    gap: Theme.spacing.md,
+  },
+  modalTitle: {
+    fontSize: Theme.typography.sizes.md,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
+    color: Theme.colors.textPrimary,
+    textAlign: 'center',
+  },
+  modalInput: {
+    backgroundColor: Theme.colors.background,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    borderRadius: 8,
+    paddingHorizontal: Theme.spacing.md,
+    paddingVertical: Theme.spacing.sm,
+    color: Theme.colors.textPrimary,
+    fontSize: Theme.typography.sizes.sm,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  modalInputDesc: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: Theme.spacing.md,
+    marginTop: Theme.spacing.sm,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: Theme.spacing.sm,
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+  },
+  modalCancelText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilySemiBold,
+    color: Theme.colors.textSecondary,
+  },
+  modalSaveBtn: {
+    flex: 1,
+    backgroundColor: Theme.colors.primary,
+    paddingVertical: Theme.spacing.sm,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  modalSaveText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.background,
   },
 });
