@@ -165,6 +165,29 @@ export const analyticsService = {
     trackEvent('recently_viewed_opened', {});
   },
 
+  trackVerificationViewed(propertyId: string) {
+    trackEvent('verification_viewed', { propertyId });
+  },
+
+  trackTimelineViewed(propertyId: string) {
+    trackEvent('timeline_viewed', { propertyId });
+  },
+
+  trackPriceHistoryViewed(propertyId: string) {
+    trackEvent('price_history_viewed', { propertyId });
+  },
+
+  trackListingReported(propertyId: string, category: string) {
+    trackEvent('listing_reported', { propertyId, category });
+  },
+
+  trackOwnerProfileViewed(ownerId: string) {
+    trackEvent('owner_profile_viewed', { ownerId });
+  },
+
+  trackTrustScoreExpanded(propertyId: string) {
+    trackEvent('trust_score_expanded', { propertyId });
+  },
 
   /** Get the current event queue for debugging */
   getEventQueue(): readonly AnalyticsEvent[] {

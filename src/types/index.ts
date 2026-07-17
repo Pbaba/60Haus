@@ -10,6 +10,7 @@ export interface UserProfile {
   preferredCity?: string;
   preferredListingType?: 'rent' | 'buy';
   preferredBudget?: number;
+  verificationLevel?: 'unverified' | 'basic' | 'verified' | 'premium';
 }
 
 export interface PropertyListing {
@@ -54,6 +55,13 @@ export interface PropertyListing {
   propertyAge?: number;
   possessionStatus?: 'ready-to-move' | 'under-construction';
   ownershipType?: 'freehold' | 'leasehold' | 'co-operative' | 'power-of-attorney';
+  propertyAgeConfidence?: 'verified' | 'estimated';
+  lastInspectionDate?: string;
+  lastInspectionConfidence?: 'verified' | 'estimated';
+  occupancyStatus?: 'vacant' | 'occupied' | 'tenant-occupied';
+  registrationAvailability?: boolean;
+  reraNumber?: string;
+  reraNumberConfidence?: 'verified' | 'estimated';
 
   // Rent specific columns
   securityDeposit?: number;
@@ -137,5 +145,41 @@ export interface AlertSubscription {
   alertType: 'new_matching_property' | 'price_drop' | 'verified_owner' | 'listing_updated';
   isActive: boolean;
   createdAt: string;
+}
+
+export interface PropertyVerification {
+  id: string;
+  propertyId: string;
+  verificationType: 'owner' | 'documents' | 'address' | 'photos' | 'contact';
+  verifiedAt: string;
+}
+
+export interface PriceHistoryRecord {
+  id: string;
+  propertyId: string;
+  price: number;
+  changedAt: string;
+}
+
+export interface PropertyActivityLog {
+  id: string;
+  propertyId: string;
+  eventType: 'listed' | 'price_updated' | 'photos_added' | 'description_updated' | 'verification_completed' | 'status_changed';
+  description: string;
+  createdAt: string;
+}
+
+export interface ListingQualityReport {
+  overallScore: number;
+  trustworthinessScore: number;
+  transparencyScore: number;
+  completenessScore: number;
+  explanations: {
+    dimension: 'trustworthiness' | 'transparency' | 'completeness';
+    title: string;
+    description: string;
+    whyItMatters: string;
+    score: number;
+  }[];
 }
 
