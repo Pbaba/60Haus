@@ -75,10 +75,17 @@ const FeedItemCellComponent: React.FC<FeedItemCellProps> = ({
           onPress={() => onPropertyPress(item)}
           style={styles.bottomInfo}
         >
-          <Text style={styles.price}>
-            {formatCurrency(item.price)}
-            <Text style={styles.perMonth}>/month</Text>
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Theme.spacing.sm, flexWrap: 'wrap' }}>
+            <Text style={styles.price}>
+              {formatCurrency(item.price)}
+              <Text style={styles.perMonth}>/month</Text>
+            </Text>
+            {item.trustSignals && item.trustSignals.some((s) => s.toLowerCase().includes('verified')) && (
+              <View style={styles.verifiedBadge}>
+                <Text style={styles.verifiedBadgeText}>Verified</Text>
+              </View>
+            )}
+          </View>
 
           {item.trustSignals && item.trustSignals.length > 0 && (
             <View style={styles.trustSignalsContainer}>
@@ -321,5 +328,18 @@ const styles = StyleSheet.create({
     fontSize: Theme.typography.sizes.xs,
     fontFamily: Theme.typography.fontFamilySemiBold,
     marginLeft: 3,
+  },
+  verifiedBadge: {
+    backgroundColor: Theme.colors.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  verifiedBadgeText: {
+    color: '#000',
+    fontSize: 10,
+    fontFamily: Theme.typography.fontFamilyBold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });

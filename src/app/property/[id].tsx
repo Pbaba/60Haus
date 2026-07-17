@@ -18,14 +18,23 @@ import { historyService } from '../../services/historyService';
 import { supabase } from '../../lib/supabase';
 import { Theme } from '../../theme';
 import { formatCurrency } from '../../utils';
-import { ArrowLeft, MapPin, Heart, Share2, Phone, GitCompare } from 'lucide-react-native';
-import { PropertyListing, UserProfile } from '../../types';
+import { ArrowLeft, MapPin, Heart, Share2, Phone, GitCompare, ShieldAlert } from 'lucide-react-native';
+import {
+  PropertyListing,
+  UserProfile,
+  PropertyVerification,
+  PriceHistoryRecord,
+  PropertyActivityLog,
+  ListingQualityReport,
+} from '../../types';
 import { analyticsService } from '../../services/analyticsService';
+import { trustService, MarketContextModel } from '../../services/trustService';
 
 export default function PropertyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const {
+    properties, // Feed items
     savedPropertyIds,
     toggleSave,
     incrementContactCount,
@@ -52,6 +61,19 @@ export default function PropertyDetailScreen() {
   const [creatingNewCollection, setCreatingNewCollection] = useState(false);
   const [newColName, setNewColName] = useState('');
   const [newColDesc, setNewColDesc] = useState('');
+
+  // Sprint 16 Trust & Quality States
+  const [verifications, setVerifications] = useState<PropertyVerification[]>([]);
+  const [priceHistory, setPriceHistory] = useState<PriceHistoryRecord[]>([]);
+  const [timeline, setTimeline] = useState<PropertyActivityLog[]>([]);
+  const [qualityReport, setQualityReport] = useState<ListingQualityReport | null>(null);
+  const [marketContext, setMarketContext] = useState<MarketContextModel | null>(null);
+
+  // Reporting States
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportCategory, setReportCategory] = useState<string | null>(null);
+  const [reportDetailsText, setReportDetailsText] = useState('');
+  const [submittingReport, setSubmittingReport] = useState(false);
 
   const isSaved = id ? savedPropertyIds.has(id) : false;
   const isCompared = id ? compareQueue.includes(id) : false;
@@ -91,6 +113,17 @@ export default function PropertyDetailScreen() {
         amenities: prop.amenities || [],
         viewCount: prop.view_count || 0,
         locality: prop.locality,
+        // Sprint 16 transparency columns
+        propertyAge: prop.property_age || null,
+        possessionStatus: prop.possession_status || null,
+        ownershipType: prop.ownership_type || null,
+        propertyAgeConfidence: prop.property_age_confidence || 'estimated',
+        lastInspectionDate: prop.last_inspection_date || null,
+        lastInspectionConfidence: prop.last_inspection_confidence || 'estimated',
+        occupancyStatus: prop.occupancy_status || null,
+        registrationAvailability: prop.registration_availability === undefined ? true : prop.registration_availability,
+        reraNumber: prop.rera_number || null,
+        reraNumberConfidence: prop.rera_number_confidence || 'estimated',
       };
 
       setProperty(mappedProperty);
@@ -116,13 +149,34 @@ export default function PropertyDetailScreen() {
         await historyService.recordView(user.id, prop.id);
       }
 
+      // 5. Load Sprint 16 verification, history timeline, and pricing context
+      try {
+        const [verifs, prices, logs] = await Promise.all([
+          trustService.getPropertyVerifications(prop.id),
+          trustService.getPropertyPriceHistory(prop.id, Number(prop.price)),
+          trustService.getPropertyTimeline(prop.id),
+        ]);
+        
+        setVerifications(verifs);
+        setPriceHistory(prices);
+        setTimeline(logs);
+        
+        const qReport = trustService.compileListingQualityReport(mappedProperty, verifs);
+        setQualityReport(qReport);
+        
+        const mContext = trustService.getMarketContext(mappedProperty, properties);
+        setMarketContext(mContext);
+      } catch (trustErr) {
+        console.warn('Failed to load trust layers:', trustErr);
+      }
+
     } catch (err) {
       console.error('Error fetching live listing details:', err);
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, [id, user, isGuest]);
+  }, [id, user, isGuest, properties]);
 
   useEffect(() => {
     loadLiveDetails();
@@ -244,6 +298,32 @@ export default function PropertyDetailScreen() {
     toggleCompare(id);
     const added = !isCompared;
     showToast(added ? 'Added to comparison queue' : 'Removed from comparison queue');
+  };
+
+  const handleReportSubmit = async () => {
+    if (!id) return;
+    if (!reportCategory) {
+      showToast('Please select a category.');
+      return;
+    }
+    setSubmittingReport(true);
+    try {
+      await trustService.submitReport(
+        id,
+        user?.id || null,
+        reportCategory,
+        reportDetailsText.trim()
+      );
+      analyticsService.trackListingReported(id, reportCategory);
+      showToast('Thank you. The listing has been reported.');
+      setReportCategory(null);
+      setReportDetailsText('');
+      setReportModalVisible(false);
+    } catch {
+      showToast('Failed to submit report. Please try again.');
+    } finally {
+      setSubmittingReport(false);
+    }
   };
 
   const handleContact = () => {
@@ -435,6 +515,260 @@ export default function PropertyDetailScreen() {
             </View>
           )}
 
+          {/* Sprint 16 Trust & Quality Hub */}
+          {qualityReport && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Listing Quality Report</Text>
+              <View style={styles.qualityCard}>
+                <View style={styles.qualityScoreHeader}>
+                  <View style={styles.qualityScoreCircle}>
+                    <Text style={styles.qualityScoreNumber}>{qualityReport.overallScore}</Text>
+                    <Text style={styles.qualityScoreLabel}>Quality Score</Text>
+                  </View>
+                  <View style={styles.qualityScoreIntro}>
+                    <Text style={styles.qualityIntroTitle}>Listing Confidence Rating</Text>
+                    <Text style={styles.qualityIntroDesc}>
+                      Evaluated dynamically based on verified owner records, document checks, metadata transparency, and description completeness.
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.dimensionsContainer}>
+                  {qualityReport.explanations.map((exp) => (
+                    <View key={exp.dimension} style={styles.dimensionRow}>
+                      <View style={styles.dimensionHeader}>
+                        <Text style={styles.dimensionTitle}>{exp.title}</Text>
+                        <Text style={styles.dimensionScore}>{exp.score}/100</Text>
+                      </View>
+                      <View style={styles.barBackground}>
+                        <View
+                          style={[
+                            styles.barForeground,
+                            {
+                              width: `${exp.score}%`,
+                              backgroundColor:
+                                exp.score >= 80
+                                  ? '#4CD964'
+                                  : exp.score >= 50
+                                  ? Theme.colors.primary
+                                  : '#FF3B30',
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.dimensionDesc}>{exp.description}</Text>
+                      <View style={styles.whyMattersBox}>
+                        <Text style={styles.whyMattersLabel}>Why this matters:</Text>
+                        <Text style={styles.whyMattersText}>{exp.whyItMatters}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Verification Checklist (Extensible model) */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Verification Status</Text>
+            <View style={styles.verificationListCard}>
+              {[
+                { type: 'owner', label: 'Verified Owner', desc: 'Listing matches verified title deeds and land registries.' },
+                { type: 'documents', label: 'Verified Documents', desc: 'Taxes, registration documents, and utility files verified by 60Haus agents.' },
+                { type: 'contact', label: 'Verified Contact', desc: 'Active phone verification and landlord validation completed.' },
+                { type: 'address', label: 'Verified Address', desc: 'Postal code and geographic address checked against municipal maps.' },
+                { type: 'photos', label: 'Verified Photos', desc: 'Photos checked for consistency against physical inspection files.' },
+              ].map((badge) => {
+                const isVerified = verifications.some((v) => v.verificationType === badge.type);
+                const verifiedRecord = verifications.find((v) => v.verificationType === badge.type);
+                
+                return (
+                  <View key={badge.type} style={[styles.badgeItem, !isVerified && styles.badgeItemInactive]}>
+                    <View style={styles.badgeLeft}>
+                      <View
+                        style={[
+                          styles.badgeIconBg,
+                          isVerified ? styles.badgeIconBgActive : styles.badgeIconBgInactive,
+                        ]}
+                      >
+                        <Text style={{ color: isVerified ? '#000' : '#8E8E93', fontSize: 10, fontWeight: 'bold' }}>✓</Text>
+                      </View>
+                      <View style={styles.badgeInfo}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <Text style={[styles.badgeLabel, isVerified && styles.badgeLabelActive]}>{badge.label}</Text>
+                          {isVerified && (
+                            <View style={styles.verifiedStamp}>
+                              <Text style={styles.verifiedStampText}>Verified</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.badgeDesc}>{badge.desc}</Text>
+                        {isVerified && verifiedRecord && (
+                          <Text style={styles.verifiedDate}>
+                            Checked on: {new Date(verifiedRecord.verifiedAt).toLocaleDateString()}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Pricing Context & History */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Market Context & Price History</Text>
+            {marketContext && (
+              <View style={styles.marketCard}>
+                <View style={styles.marketCategoryRow}>
+                  <View
+                    style={[
+                      styles.marketTag,
+                      marketContext.valuationCategory === 'Excellent value'
+                        ? styles.marketTagGood
+                        : marketContext.valuationCategory === 'Above market price'
+                        ? styles.marketTagBad
+                        : styles.marketTagFair,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.marketTagText,
+                        marketContext.valuationCategory === 'Excellent value'
+                          ? styles.marketTagTextGood
+                          : marketContext.valuationCategory === 'Above market price'
+                          ? styles.marketTagTextBad
+                          : styles.marketTagTextFair,
+                      ]}
+                    >
+                      {marketContext.valuationCategory}
+                    </Text>
+                  </View>
+                  <Text style={styles.marketDescText}>{marketContext.valuationDescription}</Text>
+                </View>
+
+                {/* Range stats */}
+                <View style={styles.marketStatsRow}>
+                  <View style={styles.statBox}>
+                    <Text style={styles.statLabel}>Local Min Price</Text>
+                    <Text style={styles.statVal}>{formatCurrency(marketContext.localPriceMin)}</Text>
+                  </View>
+                  <View style={styles.statBoxDivider} />
+                  <View style={styles.statBox}>
+                    <Text style={styles.statLabel}>Local Average</Text>
+                    <Text style={styles.statVal}>{formatCurrency(marketContext.localAveragePrice)}</Text>
+                  </View>
+                  <View style={styles.statBoxDivider} />
+                  <View style={styles.statBox}>
+                    <Text style={styles.statLabel}>Local Max Price</Text>
+                    <Text style={styles.statVal}>{formatCurrency(marketContext.localPriceMax)}</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Price Timeline List */}
+            {priceHistory.length > 0 && (
+              <View style={styles.priceHistoryCard}>
+                <Text style={styles.priceHistorySubtitle}>Price Evolution History</Text>
+                {priceHistory.map((record, index) => {
+                  let changeNode = null;
+                  if (index > 0) {
+                    const prevPrice = priceHistory[index - 1].price;
+                    const diff = record.price - prevPrice;
+                    const percent = Math.round((diff / prevPrice) * 100);
+                    const color = diff < 0 ? '#4CD964' : '#FF3B30';
+                    const sign = diff < 0 ? '' : '+';
+                    
+                    changeNode = (
+                      <Text style={[styles.priceChangeTag, { color }]}>
+                        {sign}{formatCurrency(diff)} ({sign}{percent}%)
+                      </Text>
+                    );
+                  }
+                  return (
+                    <View key={record.id} style={styles.priceHistoryRow}>
+                      <View style={styles.priceDotRow}>
+                        <View style={styles.timelineDot} />
+                        <Text style={styles.priceDate}>
+                          {new Date(record.changedAt).toLocaleDateString()}
+                        </Text>
+                      </View>
+                      <View style={styles.priceRowValue}>
+                        <Text style={styles.priceValText}>{formatCurrency(record.price)}</Text>
+                        {changeNode}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+
+          {/* Activity Timeline */}
+          {timeline.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Listing Timeline</Text>
+              <View style={styles.timelineCard}>
+                {timeline.map((log) => (
+                  <View key={log.id} style={styles.timelineRow}>
+                    <View style={styles.timelineConnectorCol}>
+                      <View style={styles.timelineDotActive} />
+                      <View style={styles.timelineBar} />
+                    </View>
+                    <View style={styles.timelineInfoCol}>
+                      <Text style={styles.timelineEventTitle}>
+                        {log.eventType.replace('_', ' ').toUpperCase()}
+                      </Text>
+                      <Text style={styles.timelineEventDesc}>{log.description}</Text>
+                      <Text style={styles.timelineEventDate}>
+                        {new Date(log.createdAt).toLocaleDateString()}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Transparency Metadata */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Listing Transparency & Confidence</Text>
+            <View style={styles.metadataCard}>
+              {[
+                { label: 'Ownership Type', value: property.ownershipType || 'Not Available', confidence: property.ownershipType ? 'verified' : 'estimated' },
+                { label: 'Property Age', value: property.propertyAge ? `${property.propertyAge} years` : 'Not Available', confidence: property.propertyAgeConfidence || 'estimated' },
+                { label: 'Last Inspection', value: property.lastInspectionDate ? new Date(property.lastInspectionDate).toLocaleDateString() : 'Not Inspected', confidence: property.lastInspectionConfidence || 'estimated' },
+                { label: 'Occupancy Status', value: property.occupancyStatus || 'Not Disclosed', confidence: property.occupancyStatus ? 'verified' : 'estimated' },
+                { label: 'Registration Certificate', value: property.registrationAvailability === undefined ? 'Unknown' : property.registrationAvailability ? 'Available' : 'Unavailable', confidence: 'verified' },
+                { label: 'RERA Registration Number', value: property.reraNumber || 'Not Registered', confidence: property.reraNumberConfidence || 'estimated' },
+              ].map((meta) => (
+                <View key={meta.label} style={styles.metaRow}>
+                  <Text style={styles.metaLabel}>{meta.label}</Text>
+                  <View style={styles.metaValueCol}>
+                    <Text style={styles.metaValueText}>{meta.value}</Text>
+                    <View
+                      style={[
+                        styles.confidenceBadge,
+                        meta.confidence === 'verified' ? styles.confidenceBadgeVerified : styles.confidenceBadgeEstimated,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.confidenceBadgeText,
+                          meta.confidence === 'verified' ? styles.confidenceBadgeTextVerified : styles.confidenceBadgeTextEstimated,
+                        ]}
+                      >
+                        {meta.confidence}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+
           {/* Owner details Card */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Listing Host</Text>
@@ -445,14 +779,41 @@ export default function PropertyDetailScreen() {
                 size="md"
               />
               <View style={styles.ownerInfo}>
-                <Text style={styles.ownerName}>{ownerProfile?.fullName || 'Verified Owner'}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <Text style={styles.ownerName}>{ownerProfile?.fullName || 'Verified Owner'}</Text>
+                  {ownerProfile?.verificationLevel && ownerProfile.verificationLevel !== 'unverified' && (
+                    <View style={styles.ownerVerifBadge}>
+                      <Text style={styles.ownerVerifBadgeText}>
+                        {ownerProfile.verificationLevel} Host
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={styles.ownerTitle}>Property Owner / Landlord</Text>
+                <Text style={styles.ownerMetaText}>
+                  Member since: {ownerProfile ? new Date(ownerProfile.createdAt).toLocaleDateString() : '2024'}
+                </Text>
+                <Text style={styles.ownerMetaText}>
+                  Active Listings: {properties.filter((p) => p.ownerId === property.ownerId).length || 1} properties
+                </Text>
                 {ownerProfile?.bio ? <Text style={styles.ownerBio} numberOfLines={2}>{ownerProfile.bio}</Text> : null}
               </View>
             </View>
           </View>
 
-          {/* Related Listings */}
+          {/* Report Listing Card Button */}
+          <TouchableOpacity
+            style={styles.reportListingCardRow}
+            onPress={() => {
+              setReportModalVisible(true);
+              analyticsService.trackTrustScoreExpanded(property.id); // Tracks event
+            }}
+            accessibilityLabel="Report listing issues button"
+            accessibilityRole="button"
+          >
+            <ShieldAlert size={18} color={Theme.colors.danger || '#FF3B30'} />
+            <Text style={styles.reportListingText}>Report listing errors, spam or suspicious pricing</Text>
+          </TouchableOpacity>
           {related.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Related Listings</Text>
@@ -607,6 +968,86 @@ export default function PropertyDetailScreen() {
                 accessibilityRole="button"
               >
                 <Text style={styles.modalSaveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Sprint 16 - Report Listing Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={reportModalVisible}
+        onRequestClose={() => setReportModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent} accessibilityViewIsModal={true}>
+            <Text style={styles.modalTitle}>Report Listing Issue</Text>
+            <Text style={styles.modalSubtitle}>Help us keep 60Haus trustworthy. Select a category:</Text>
+
+            <ScrollView style={{ maxHeight: 150 }} nestedScrollEnabled>
+              {[
+                { key: 'incorrect_information', label: 'Incorrect Information' },
+                { key: 'fake_photos', label: 'Fake Photos' },
+                { key: 'duplicate_listing', label: 'Duplicate Listing' },
+                { key: 'already_sold', label: 'Already Sold / Unavail' },
+                { key: 'spam', label: 'Spam listing' },
+                { key: 'suspicious_pricing', label: 'Suspicious Pricing' },
+                { key: 'other', label: 'Other Issue' },
+              ].map((cat) => (
+                <TouchableOpacity
+                  key={cat.key}
+                  style={[
+                    styles.collectionSelectItem,
+                    reportCategory === cat.key && styles.collectionSelectItemActive,
+                  ]}
+                  onPress={() => setReportCategory(cat.key)}
+                  accessibilityLabel={`Report as ${cat.label}`}
+                  accessibilityRole="button"
+                >
+                  <Text
+                    style={[
+                      styles.collectionSelectText,
+                      reportCategory === cat.key && styles.collectionSelectTextActive,
+                    ]}
+                  >
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <TextInput
+              style={[styles.modalInputNote, { height: 60 }]}
+              placeholder="Provide extra details (optional)..."
+              placeholderTextColor={Theme.colors.textSecondary}
+              value={reportDetailsText}
+              onChangeText={setReportDetailsText}
+              multiline
+              maxLength={200}
+              accessibilityLabel="Report Details Text"
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setReportModalVisible(false)}
+                accessibilityLabel="Cancel report"
+                accessibilityRole="button"
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSaveBtn, { backgroundColor: Theme.colors.danger || '#FF3B30' }]}
+                onPress={handleReportSubmit}
+                disabled={submittingReport}
+                accessibilityLabel="Confirm submit report"
+                accessibilityRole="button"
+              >
+                <Text style={[styles.modalSaveText, { color: '#FFF' }]}>
+                  {submittingReport ? 'Submitting...' : 'Submit Report'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -941,5 +1382,459 @@ const styles = StyleSheet.create({
     fontSize: Theme.typography.sizes.xs,
     fontFamily: Theme.typography.fontFamilyBold,
     color: Theme.colors.background,
+  },
+  qualityCard: {
+    backgroundColor: '#151518',
+    borderRadius: 12,
+    padding: Theme.spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  qualityScoreHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    paddingBottom: Theme.spacing.md,
+    marginBottom: Theme.spacing.md,
+  },
+  qualityScoreCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 3,
+    borderColor: Theme.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(212, 163, 89, 0.05)',
+  },
+  qualityScoreNumber: {
+    fontSize: Theme.typography.sizes.lg,
+    color: Theme.colors.primary,
+    fontFamily: Theme.typography.fontFamilyBold,
+  },
+  qualityScoreLabel: {
+    fontSize: 7,
+    color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamilyBold,
+    textTransform: 'uppercase',
+    marginTop: -2,
+  },
+  qualityScoreIntro: {
+    flex: 1,
+    gap: 2,
+  },
+  qualityIntroTitle: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.textPrimary,
+  },
+  qualityIntroDesc: {
+    fontSize: 11,
+    fontFamily: Theme.typography.fontFamily,
+    color: Theme.colors.textSecondary,
+    lineHeight: 14,
+  },
+  dimensionsContainer: {
+    gap: Theme.spacing.md,
+  },
+  dimensionRow: {
+    gap: 4,
+  },
+  dimensionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dimensionTitle: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilySemiBold,
+    color: Theme.colors.textPrimary,
+  },
+  dimensionScore: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.primary,
+  },
+  barBackground: {
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginVertical: 2,
+  },
+  barForeground: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  dimensionDesc: {
+    fontSize: 11,
+    fontFamily: Theme.typography.fontFamily,
+    color: Theme.colors.textSecondary,
+    lineHeight: 14,
+  },
+  whyMattersBox: {
+    backgroundColor: 'rgba(212, 163, 89, 0.04)',
+    borderLeftWidth: 2,
+    borderLeftColor: Theme.colors.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 4,
+    marginTop: 4,
+  },
+  whyMattersLabel: {
+    fontSize: 10,
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.2,
+    marginBottom: 2,
+  },
+  whyMattersText: {
+    fontSize: 11,
+    fontFamily: Theme.typography.fontFamily,
+    color: Theme.colors.textSecondary,
+    lineHeight: 14,
+  },
+  verificationListCard: {
+    backgroundColor: '#151518',
+    borderRadius: 12,
+    padding: Theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    gap: Theme.spacing.xs,
+  },
+  badgeItem: {
+    padding: Theme.spacing.sm,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+  },
+  badgeItemInactive: {
+    opacity: 0.6,
+  },
+  badgeLeft: {
+    flexDirection: 'row',
+    gap: Theme.spacing.md,
+  },
+  badgeIconBg: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  badgeIconBgActive: {
+    backgroundColor: Theme.colors.primary,
+  },
+  badgeIconBgInactive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  badgeInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  badgeLabel: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyMedium,
+    color: Theme.colors.textSecondary,
+  },
+  badgeLabelActive: {
+    color: Theme.colors.textPrimary,
+    fontFamily: Theme.typography.fontFamilyBold,
+  },
+  badgeDesc: {
+    fontSize: 11,
+    fontFamily: Theme.typography.fontFamily,
+    color: Theme.colors.textSecondary,
+    lineHeight: 14,
+  },
+  verifiedStamp: {
+    backgroundColor: 'rgba(76, 217, 100, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  verifiedStampText: {
+    color: '#4CD964',
+    fontSize: 8,
+    fontFamily: Theme.typography.fontFamilyBold,
+    textTransform: 'uppercase',
+  },
+  verifiedDate: {
+    fontSize: 10,
+    fontFamily: Theme.typography.fontFamily,
+    color: Theme.colors.primary,
+    marginTop: 2,
+  },
+  marketCard: {
+    backgroundColor: '#151518',
+    borderRadius: 12,
+    padding: Theme.spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: Theme.spacing.md,
+  },
+  marketCategoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    paddingBottom: Theme.spacing.md,
+    marginBottom: Theme.spacing.md,
+    flexWrap: 'wrap',
+  },
+  marketTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  marketTagGood: {
+    backgroundColor: 'rgba(76, 217, 100, 0.15)',
+  },
+  marketTagBad: {
+    backgroundColor: 'rgba(255, 59, 48, 0.15)',
+  },
+  marketTagFair: {
+    backgroundColor: 'rgba(212, 163, 89, 0.15)',
+  },
+  marketTagText: {
+    fontSize: 10,
+    fontFamily: Theme.typography.fontFamilyBold,
+    textTransform: 'uppercase',
+  },
+  marketTagTextGood: {
+    color: '#4CD964',
+  },
+  marketTagTextBad: {
+    color: '#FF3B30',
+  },
+  marketTagTextFair: {
+    color: Theme.colors.primary,
+  },
+  marketDescText: {
+    flex: 1,
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilySemiBold,
+    color: Theme.colors.textPrimary,
+  },
+  marketStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statBox: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  statLabel: {
+    fontSize: 9,
+    fontFamily: Theme.typography.fontFamilyMedium,
+    color: Theme.colors.textSecondary,
+    textTransform: 'uppercase',
+  },
+  statVal: {
+    fontSize: Theme.typography.sizes.sm,
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.textPrimary,
+  },
+  statBoxDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  priceHistoryCard: {
+    backgroundColor: '#151518',
+    borderRadius: 12,
+    padding: Theme.spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  priceHistorySubtitle: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.textPrimary,
+    marginBottom: Theme.spacing.md,
+  },
+  priceHistoryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  priceDotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Theme.spacing.sm,
+  },
+  timelineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Theme.colors.primary,
+  },
+  priceDate: {
+    fontSize: 11,
+    fontFamily: Theme.typography.fontFamily,
+    color: Theme.colors.textSecondary,
+  },
+  priceRowValue: {
+    alignItems: 'flex-end',
+    gap: 2,
+  },
+  priceValText: {
+    fontSize: Theme.typography.sizes.sm,
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.textPrimary,
+  },
+  priceChangeTag: {
+    fontSize: 9,
+    fontFamily: Theme.typography.fontFamilyBold,
+  },
+  timelineCard: {
+    backgroundColor: '#151518',
+    borderRadius: 12,
+    padding: Theme.spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  timelineRow: {
+    flexDirection: 'row',
+    gap: Theme.spacing.md,
+  },
+  timelineConnectorCol: {
+    alignItems: 'center',
+    width: 12,
+  },
+  timelineDotActive: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: Theme.colors.primary,
+    zIndex: 2,
+    marginTop: 4,
+  },
+  timelineBar: {
+    flex: 1,
+    width: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    marginVertical: 4,
+  },
+  timelineInfoCol: {
+    flex: 1,
+    paddingBottom: Theme.spacing.md,
+    gap: 2,
+  },
+  timelineEventTitle: {
+    fontSize: 11,
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.primary,
+    letterSpacing: 0.5,
+  },
+  timelineEventDesc: {
+    fontSize: 12,
+    fontFamily: Theme.typography.fontFamily,
+    color: Theme.colors.textPrimary,
+    lineHeight: 15,
+  },
+  timelineEventDate: {
+    fontSize: 10,
+    fontFamily: Theme.typography.fontFamily,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  metadataCard: {
+    backgroundColor: '#151518',
+    borderRadius: 12,
+    paddingHorizontal: Theme.spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  metaLabel: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyMedium,
+    color: Theme.colors.textSecondary,
+  },
+  metaValueCol: {
+    alignItems: 'flex-end',
+    gap: Theme.spacing.xs,
+  },
+  metaValueText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.textPrimary,
+  },
+  confidenceBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  confidenceBadgeVerified: {
+    backgroundColor: 'rgba(76, 217, 100, 0.15)',
+  },
+  confidenceBadgeEstimated: {
+    backgroundColor: 'rgba(212, 163, 89, 0.15)',
+  },
+  confidenceBadgeText: {
+    fontSize: 8,
+    fontFamily: Theme.typography.fontFamilyBold,
+    textTransform: 'uppercase',
+  },
+  confidenceBadgeTextVerified: {
+    color: '#4CD964',
+  },
+  confidenceBadgeTextEstimated: {
+    color: Theme.colors.primary,
+  },
+  ownerVerifBadge: {
+    backgroundColor: 'rgba(212, 163, 89, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  ownerVerifBadgeText: {
+    fontSize: Theme.typography.sizes.xxs,
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: Theme.colors.primary,
+    textTransform: 'uppercase',
+  },
+  ownerMetaText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamily,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  reportListingCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Theme.spacing.sm,
+    paddingVertical: Theme.spacing.md,
+    paddingHorizontal: Theme.spacing.lg,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 59, 48, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 59, 48, 0.15)',
+    marginTop: Theme.spacing.md,
+    marginBottom: Theme.spacing.lg,
+  },
+  reportListingText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamilySemiBold,
+    color: '#FF3B30',
   },
 });
