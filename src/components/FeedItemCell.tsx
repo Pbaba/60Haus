@@ -4,9 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PropertyListing } from '../types';
 import { Theme } from '../theme';
 import { formatCurrency } from '../utils';
-import { Award, MapPin, Sparkles, Phone, Flag, Bookmark } from 'lucide-react-native';
-import { VideoFeedItem } from './VideoFeedItem';
-import { ImageFeedItem } from './ImageFeedItem';
+import { MapPin, Sparkles, Phone, Flag, Bookmark } from 'lucide-react-native';
+import { UnifiedMediaCarousel } from './UnifiedMediaCarousel';
 import { Button } from './Button';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -43,31 +42,23 @@ const FeedItemCellComponent: React.FC<FeedItemCellProps> = ({
 
   return (
     <View style={styles.page}>
-      {item.videoUrl ? (
-        <VideoFeedItem
-          videoUrl={item.videoUrl}
-          thumbnailUrl={item.thumbnailUrl}
-          isActive={isActive}
-          isMuted={isMuted}
-          onToggleMute={onToggleMute}
-          onViewCountIncrement={onViewCountIncrement}
-          onDoubleTapSave={() => onSavePress(item.id)}
-          shouldLoad={shouldLoad}
-        />
-      ) : (
-        <ImageFeedItem
-          imageUrls={item.imageUrls || []}
-          thumbnailUrl={item.thumbnailUrl}
-          onDoubleTapSave={() => onSavePress(item.id)}
-        />
-      )}
+      <UnifiedMediaCarousel
+        item={item}
+        isActive={isActive}
+        isMuted={isMuted}
+        onToggleMute={onToggleMute}
+        onViewCountIncrement={onViewCountIncrement}
+        onDoubleTapSave={() => onSavePress(item.id)}
+        shouldLoad={shouldLoad}
+      />
 
-      <View style={styles.gradientOverlay} />
+      <View style={styles.gradientOverlay} pointerEvents="none" />
 
       <View
+        pointerEvents="box-none"
         style={[
           styles.overlayContent,
-          { paddingBottom: insets.bottom + Theme.floatingDock.height + Theme.spacing.lg },
+          { paddingBottom: insets.bottom + Theme.floatingDock.height + Theme.spacing.xs },
         ]}
       >
         <TouchableOpacity
@@ -75,35 +66,38 @@ const FeedItemCellComponent: React.FC<FeedItemCellProps> = ({
           onPress={() => onPropertyPress(item)}
           style={styles.bottomInfo}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Theme.spacing.sm, flexWrap: 'wrap' }}>
-            <Text style={styles.price}>
-              {formatCurrency(item.price)}
-              <Text style={styles.perMonth}>/month</Text>
-            </Text>
-            {item.trustSignals && item.trustSignals.some((s) => s.toLowerCase().includes('verified')) && (
-              <View style={styles.verifiedBadge}>
-                <Text style={styles.verifiedBadgeText}>Verified</Text>
-              </View>
-            )}
-          </View>
+          <Text style={styles.price}>
+            {formatCurrency(item.price)}
+            <Text style={styles.perMonth}>/month</Text>
+          </Text>
 
-          {item.trustSignals && item.trustSignals.length > 0 && (
-            <View style={styles.trustSignalsContainer}>
-              {item.trustSignals.map((signal) => (
-                <View key={signal} style={styles.trustSignalBadge}>
-                  <Award size={10} color={Theme.colors.primary} />
-                  <Text style={styles.trustSignalText}>{signal}</Text>
-                </View>
-              ))}
-            </View>
-          )}
+          <View style={styles.metadataRow}>
+            {item.trustSignals && item.trustSignals.some((s) => s.toLowerCase().includes('verified')) && (
+              <>
+                <Text style={styles.metadataText}>✓ Verified</Text>
+                <Text style={styles.metadataSeparator}>•</Text>
+              </>
+            )}
+            <Text style={styles.metadataText}>
+              {(() => {
+                if (!item.createdAt) return 'Listed recently';
+                const date = new Date(item.createdAt);
+                const now = new Date();
+                const diffMs = now.getTime() - date.getTime();
+                const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                if (diffDays === 0) return 'Listed Today';
+                if (diffDays === 1) return 'Listed Yesterday';
+                return `${diffDays}d ago`;
+              })()}
+            </Text>
+          </View>
 
           <Text style={styles.title} numberOfLines={1}>
             {item.title}
           </Text>
 
           <Text style={styles.location}>
-            <MapPin size={16} color={Theme.colors.textSecondary} />
+            <MapPin size={12} color={Theme.colors.textSecondary} style={{ marginRight: 2 }} />
             {item.address}, {item.city}
           </Text>
 
@@ -123,12 +117,12 @@ const FeedItemCellComponent: React.FC<FeedItemCellProps> = ({
 
           {item.personalizationExplanations && item.personalizationExplanations.length > 0 && (
             <View style={styles.explanationsContainer}>
-              {item.personalizationExplanations.map((exp) => (
-                <View key={exp} style={styles.explanationTag}>
-                  <Sparkles size={10} color="#FFF" />
-                  <Text style={styles.explanationTagText}>{exp}</Text>
-                </View>
-              ))}
+              <View style={styles.explanationTag}>
+                <Sparkles size={10} color="#FFF" />
+                <Text style={styles.explanationTagText}>
+                  {item.personalizationExplanations[0]}
+                </Text>
+              </View>
             </View>
           )}
 
@@ -211,11 +205,11 @@ const styles = StyleSheet.create({
   bottomInfo: {
     flex: 1,
     alignSelf: 'flex-end',
-    marginBottom: Theme.spacing.md,
-    gap: Theme.spacing.xs,
+    marginBottom: Theme.spacing.xs,
+    gap: 2,
   },
   price: {
-    fontSize: Theme.typography.sizes.h1,
+    fontSize: Theme.typography.sizes.h2,
     color: Theme.colors.textPrimary,
     fontFamily: Theme.typography.fontFamilyBold,
   },
@@ -224,14 +218,30 @@ const styles = StyleSheet.create({
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
   },
+  metadataRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 1,
+    marginBottom: 4,
+  },
+  metadataText: {
+    fontSize: Theme.typography.sizes.xs,
+    color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamily,
+  },
+  metadataSeparator: {
+    fontSize: Theme.typography.sizes.xs,
+    color: Theme.colors.textMuted,
+  },
   title: {
-    fontSize: Theme.typography.sizes.xl,
+    fontSize: Theme.typography.sizes.lg,
     color: Theme.colors.textPrimary,
     fontFamily: Theme.typography.fontFamilyEditorialBold,
     letterSpacing: Theme.typography.letterSpacing.tight,
   },
   location: {
-    fontSize: Theme.typography.sizes.md,
+    fontSize: Theme.typography.sizes.sm,
     color: Theme.colors.textSecondary,
     fontFamily: Theme.typography.fontFamily,
     flexDirection: 'row',
@@ -241,24 +251,26 @@ const styles = StyleSheet.create({
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Theme.spacing.sm,
-    marginTop: Theme.spacing.xs,
-    marginBottom: Theme.spacing.md,
+    gap: 6,
+    marginTop: 2,
+    marginBottom: 6,
   },
   tag: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingVertical: Theme.spacing.xs,
-    paddingHorizontal: Theme.spacing.md,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
     borderRadius: Theme.borderRadius.full,
   },
   tagText: {
-    fontSize: Theme.typography.sizes.sm,
+    fontSize: Theme.typography.sizes.xs,
     color: Theme.colors.textPrimary,
     fontFamily: Theme.typography.fontFamily,
     textTransform: 'capitalize',
   },
   contactBtn: {
     width: '90%',
+    height: 40,
+    marginTop: 4,
   },
   sidebar: {
     alignSelf: 'flex-end',
@@ -281,37 +293,12 @@ const styles = StyleSheet.create({
     borderColor: Theme.colors.primary,
     backgroundColor: Theme.colors.primary + '20',
   },
-  trustSignalsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 6,
-    marginBottom: 4,
-  },
-  trustSignalBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(212, 163, 89, 0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(212, 163, 89, 0.25)',
-  },
-  trustSignalText: {
-    color: Theme.colors.primary,
-    fontSize: Theme.typography.sizes.xxs,
-    fontFamily: Theme.typography.fontFamilyBold,
-    marginLeft: 3,
-    textTransform: 'uppercase',
-    letterSpacing: Theme.typography.letterSpacing.wide,
-  },
   explanationsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginTop: Theme.spacing.xs,
-    marginBottom: Theme.spacing.sm,
+    marginTop: 2,
+    marginBottom: 6,
   },
   explanationTag: {
     flexDirection: 'row',
@@ -328,18 +315,5 @@ const styles = StyleSheet.create({
     fontSize: Theme.typography.sizes.xs,
     fontFamily: Theme.typography.fontFamilySemiBold,
     marginLeft: 3,
-  },
-  verifiedBadge: {
-    backgroundColor: Theme.colors.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-  },
-  verifiedBadgeText: {
-    color: '#000',
-    fontSize: 10,
-    fontFamily: Theme.typography.fontFamilyBold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
 });

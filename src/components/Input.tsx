@@ -22,6 +22,7 @@ export const Input: React.FC<InputProps> = ({
   error,
   containerStyle,
   inputStyle,
+  style,
   onFocus,
   onBlur,
   ...props
@@ -38,8 +39,18 @@ export const Input: React.FC<InputProps> = ({
     if (onBlur) onBlur(e);
   };
 
+  const resolvedContainerStyle = StyleSheet.flatten([
+    styles.container,
+    containerStyle,
+    style,
+  ]) as any;
+
+  if (resolvedContainerStyle && (resolvedContainerStyle.flex !== undefined || resolvedContainerStyle.flexGrow !== undefined)) {
+    resolvedContainerStyle.width = undefined;
+  }
+
   return (
-    <View style={[styles.container, containerStyle]}>
+    <View style={resolvedContainerStyle}>
       {label && <Text style={styles.label}>{label}</Text>}
       <View
         style={[
@@ -65,6 +76,7 @@ export const Input: React.FC<InputProps> = ({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
+    minWidth: 140,
     marginBottom: Theme.spacing.md,
   },
   label: {

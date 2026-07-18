@@ -28,7 +28,7 @@ export interface PropertyListing {
   videoUrl: string;
   thumbnailUrl?: string;
   createdAt: string;
-  status?: 'draft' | 'published' | 'archived' | 'available' | 'reserved' | 'sold' | 'rented' | 'coming-soon';
+  status?: 'draft' | 'pending' | 'published' | 'archived' | 'available' | 'reserved' | 'sold' | 'rented' | 'coming-soon';
   imageUrls?: string[];
   amenities?: string[];
   latitude?: number;

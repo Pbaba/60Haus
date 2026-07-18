@@ -11,7 +11,9 @@ export default function TabsLayout() {
 
   // Determine active tab key based on pathname
   let activeTab = 'index';
-  if (pathname.includes('/saved')) {
+  if (pathname.includes('/discover')) {
+    activeTab = 'discover';
+  } else if (pathname.includes('/saved')) {
     activeTab = 'saved';
   } else if (pathname.includes('/profile')) {
     activeTab = 'profile';
@@ -36,6 +38,7 @@ export default function TabsLayout() {
         }}
       >
         <Tabs.Screen name="index" />
+        <Tabs.Screen name="discover" />
         <Tabs.Screen name="saved" />
         <Tabs.Screen name="profile" />
       </Tabs>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -11,10 +11,13 @@ import { useProfile } from '../../hooks/useProfile';
 import { useAuth } from '../../hooks/useAuth';
 import { ArrowLeft, Image as ImageIcon, Video, X, CheckCircle } from 'lucide-react-native';
 import { Image } from 'expo-image';
-import { propertyUploadService, VideoAsset } from '../../services/propertyUploadService';
+import { VideoAsset } from '../../services/propertyUploadService';
 import { useFeedback } from '../../context/FeedbackContext';
 import { profileService } from '../../services/profileService';
 import { AMENITIES, AMENITY_CATEGORIES } from '../../constants/property';
+import { DraftManager } from '../../media/DraftManager';
+import { MediaValidator } from '../../media/MediaValidator';
+import { SegmentedSelector, TagCarousel } from '../../components/SelectionComponents';
 
 export default function OwnerUploadScreen() {
   const router = useRouter();
@@ -22,10 +25,8 @@ export default function OwnerUploadScreen() {
   const { 
     publishListing, 
     updateListing, 
-    imageUploadProgress, 
-    videoUploadProgress, 
     publishing, 
-    publishingStage,
+    publishingProgress,
     properties 
   } = useProperties();
   const { profile, upgradeToOwner, updateProfile } = useProfile();
@@ -102,8 +103,174 @@ export default function OwnerUploadScreen() {
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [coverImageIndex, setCoverImageIndex] = useState(0);
+  const [showPublishingStatus, setShowPublishingStatus] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [videoAssetInfo, setVideoAssetInfo] = useState<VideoAsset | undefined>(undefined);
+
+  const shiftImageLeft = (index: number) => {
+    if (index === 0) return;
+    setSelectedImages((prev) => {
+      const next = [...prev];
+      const temp = next[index];
+      next[index] = next[index - 1];
+      next[index - 1] = temp;
+      
+      if (coverImageIndex === index) {
+        setCoverImageIndex(index - 1);
+      } else if (coverImageIndex === index - 1) {
+        setCoverImageIndex(index);
+      }
+      return next;
+    });
+  };
+
+  const shiftImageRight = (index: number) => {
+    if (index === selectedImages.length - 1) return;
+    setSelectedImages((prev) => {
+      const next = [...prev];
+      const temp = next[index];
+      next[index] = next[index + 1];
+      next[index + 1] = temp;
+      
+      if (coverImageIndex === index) {
+        setCoverImageIndex(index + 1);
+      } else if (coverImageIndex === index + 1) {
+        setCoverImageIndex(index);
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (coverImageIndex >= selectedImages.length) {
+      setCoverImageIndex(0);
+    }
+  }, [selectedImages, coverImageIndex]);
+
+  const getDraftData = useCallback(() => {
+    return {
+      title,
+      price,
+      address,
+      city,
+      bhk,
+      furnishing,
+      propertyType,
+      description,
+      locality,
+      contactPhone,
+      listingType,
+      status,
+      selectedAmenities,
+      selectedImages,
+      selectedVideo,
+      carpetArea,
+      builtUpArea,
+      superBuiltUpArea,
+      plotArea,
+      propertyAge,
+      possessionStatus,
+      ownershipType,
+      securityDeposit,
+      monthlyMaintenance,
+      brokerage,
+      leaseDuration,
+      availableFrom,
+      preferredTenant,
+    };
+  }, [
+    title, price, address, city, bhk, furnishing, propertyType, description, locality,
+    contactPhone, listingType, status, selectedAmenities, selectedImages, selectedVideo,
+    carpetArea, builtUpArea, superBuiltUpArea, plotArea, propertyAge, possessionStatus,
+    ownershipType, securityDeposit, monthlyMaintenance, brokerage, leaseDuration,
+    availableFrom, preferredTenant
+  ]);
+
+  useEffect(() => {
+    if (id) return;
+
+    const checkDraft = async () => {
+      const draft = await DraftManager.loadDraft();
+      if (draft) {
+        Alert.alert(
+          'Resume Listing?',
+          'You have an unfinished property listing. Would you like to restore it?',
+          [
+            {
+              text: 'Discard',
+              style: 'destructive',
+              onPress: async () => {
+                await DraftManager.clearDraft();
+              },
+            },
+            {
+              text: 'Restore',
+              onPress: () => {
+                setTitle(draft.title);
+                setPrice(draft.price);
+                setAddress(draft.address);
+                setCity(draft.city);
+                setBhk(draft.bhk);
+                setFurnishing(draft.furnishing);
+                setPropertyType(draft.propertyType);
+                setDescription(draft.description);
+                setLocality(draft.locality);
+                setContactPhone(draft.contactPhone);
+                setListingType(draft.listingType);
+                setStatus(draft.status);
+                setSelectedAmenities(draft.selectedAmenities);
+                setSelectedImages(draft.selectedImages);
+                setSelectedVideo(draft.selectedVideo);
+                
+                setCarpetArea(draft.carpetArea || '');
+                setBuiltUpArea(draft.builtUpArea || '');
+                setSuperBuiltUpArea(draft.superBuiltUpArea || '');
+                setPlotArea(draft.plotArea || '');
+                setPropertyAge(draft.propertyAge || '');
+                setPossessionStatus(draft.possessionStatus || 'ready-to-move');
+                setOwnershipType(draft.ownershipType || 'freehold');
+
+                setSecurityDeposit(draft.securityDeposit || '');
+                setMonthlyMaintenance(draft.monthlyMaintenance || '');
+                setBrokerage(draft.brokerage || '');
+                setLeaseDuration(draft.leaseDuration || '');
+                setAvailableFrom(draft.availableFrom || 'Immediate');
+                setPreferredTenant(draft.preferredTenant || 'anyone');
+              },
+            },
+          ]
+        );
+      }
+    };
+    checkDraft();
+  }, [id]);
+
+  useEffect(() => {
+    if (id) return;
+
+    const interval = setInterval(() => {
+      const data = getDraftData();
+      if (data.title || data.price || data.address || data.selectedImages.length > 0 || data.selectedVideo) {
+        DraftManager.saveDraft(data);
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [id, getDraftData]);
+
+  useEffect(() => {
+    return () => {
+      if (!id) {
+        const data = getDraftData();
+        if (data.title || data.price || data.address || data.selectedImages.length > 0 || data.selectedVideo) {
+          DraftManager.saveDraft(data);
+        }
+      }
+    };
+  }, [id, getDraftData]);
+
+
 
   // Prefill when editing
   useEffect(() => {
@@ -206,7 +373,7 @@ export default function OwnerUploadScreen() {
       };
 
       try {
-        propertyUploadService.validateVideo(info);
+        MediaValidator.validateVideoAsset(asset.uri, asset.duration || undefined);
         setSelectedVideo(asset.uri);
         setVideoAssetInfo(info);
       } catch (err: any) {
@@ -251,6 +418,7 @@ export default function OwnerUploadScreen() {
     }
 
     try {
+      setShowPublishingStatus(true);
       if (contactPhone && contactPhone !== profile?.phoneNumber) {
         try {
           await updateProfile({ phoneNumber: contactPhone });
@@ -295,16 +463,115 @@ export default function OwnerUploadScreen() {
         preferredTenant: listingType === 'rent' ? preferredTenant : undefined,
       };
 
-      if (id) {
-        await updateListing(id, listingData, selectedImages, selectedVideo || undefined, videoAssetInfo);
-      } else {
-        await publishListing(listingData, selectedImages, selectedVideo || undefined, videoAssetInfo);
+      // Rearrange selectedImages to put the cover image at index 0
+      const finalImagesList = [...selectedImages];
+      if (coverImageIndex > 0 && coverImageIndex < finalImagesList.length) {
+        const coverImg = finalImagesList[coverImageIndex];
+        finalImagesList.splice(coverImageIndex, 1);
+        finalImagesList.unshift(coverImg);
       }
-      router.replace('/(tabs)' as any);
+
+      if (id) {
+        await updateListing(id, listingData, finalImagesList, selectedVideo || undefined, videoAssetInfo);
+      } else {
+        const propertyId = await publishListing(listingData, finalImagesList, selectedVideo || undefined, videoAssetInfo);
+        
+        // Discard local draft if publishing is successful
+        await DraftManager.clearDraft();
+
+        router.replace({
+          pathname: '/owner/success' as any,
+          params: {
+            id: propertyId as any,
+            title,
+            price,
+            city,
+            locality,
+            propertyType,
+            bedrooms: bhk,
+            furnishing,
+            listingType,
+          },
+        });
+      }
     } catch {
       // Handled globally by publishing context pipeline overlays
     }
   };
+
+  if (showPublishingStatus) {
+    const progressVal = publishingProgress?.progress || 0;
+    const activeStage = publishingProgress?.stage || 'idle';
+    const completedStages = publishingProgress?.completedStages || [];
+
+    const getStageState = (stageName: string) => {
+      if (activeStage === 'failed') return 'failed';
+      if (completedStages.includes(stageName as any)) return 'completed';
+      if (activeStage === stageName) return 'active';
+      return 'pending';
+    };
+
+    const renderStageIndicator = (st: string) => {
+      if (st === 'completed') {
+        return <Text style={{ color: '#D4A359', fontWeight: 'bold' }}>✓</Text>;
+      }
+      if (st === 'active') {
+        return <ActivityIndicator size="small" color={Theme.colors.primary} />;
+      }
+      if (st === 'failed') {
+        return <Text style={{ color: '#FF3B30', fontWeight: 'bold' }}>✗</Text>;
+      }
+      return <View style={styles.pendingDot} />;
+    };
+
+    return (
+      <ScreenContainer style={styles.container} scrollable>
+        <View style={styles.publishingContent}>
+          <Text style={styles.publishingTitle}>{id ? 'Saving Changes...' : 'Publishing Listing...'}</Text>
+          <Text style={styles.publishingSubtitle}>Please keep the application open during this process.</Text>
+
+          {/* Real weighted progress bar */}
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressIndicatorFill, { width: `${progressVal}%` }]} />
+          </View>
+          <Text style={styles.progressPercentText}>{progressVal}% Complete</Text>
+
+          {/* Checklist */}
+          <View style={styles.checklist}>
+            {[
+              { key: 'validating', label: 'Validating Listing Details' },
+              { key: 'creating_listing', label: 'Creating Pending Listing Record' },
+              { key: 'processing_images', label: 'Optimizing Property Photos' },
+              { key: 'compressing_video', label: 'Compressing Walkthrough Video' },
+              { key: 'generating_thumbnail', label: 'Generating Video Thumbnail' },
+              { key: 'uploading', label: 'Uploading Media Assets' },
+              { key: 'completed', label: 'Publishing Live Listing' },
+            ].map((step) => {
+              const state = getStageState(step.key);
+              return (
+                <View key={step.key} style={[styles.checklistItem, state === 'pending' && styles.checklistPending]}>
+                  <View style={styles.checkIconWrapper}>{renderStageIndicator(state)}</View>
+                  <Text style={[styles.checklistLabel, state === 'completed' && styles.checklistCompletedLabel]}>
+                    {step.label}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+
+          {activeStage === 'failed' && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorTitle}>Upload Interrupted</Text>
+              <Text style={styles.errorText}>{publishingProgress?.details || 'An error occurred during publication.'}</Text>
+              <Button variant="primary" onPress={() => setShowPublishingStatus(false)} style={{ marginTop: 12 }}>
+                Modify Listing & Retry
+              </Button>
+            </View>
+          )}
+        </View>
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer style={styles.container} scrollable>
@@ -351,14 +618,41 @@ export default function OwnerUploadScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.imagePreviewContainer}
           >
-            {selectedImages.map((uri, index) => (
-              <View key={index} style={styles.previewWrapper}>
-                <Image source={{ uri }} style={styles.previewImage} contentFit="cover" />
-                <TouchableOpacity style={styles.removeBtn} onPress={() => removeImage(index)} disabled={publishing}>
-                  <X size={14} color="#FFF" />
-                </TouchableOpacity>
-              </View>
-            ))}
+            {selectedImages.map((uri, index) => {
+              const isCover = index === coverImageIndex;
+              return (
+                <View key={index} style={[styles.previewWrapper, isCover && styles.previewWrapperCover]}>
+                  <Image source={{ uri }} style={styles.previewImage} contentFit="cover" />
+                  
+                  {/* Cover Selection Tag */}
+                  <TouchableOpacity
+                    style={[styles.coverTag, isCover && styles.coverTagActive]}
+                    onPress={() => setCoverImageIndex(index)}
+                    disabled={publishing}
+                  >
+                    <Text style={styles.coverTagText}>{isCover ? '★ Cover' : 'Make Cover'}</Text>
+                  </TouchableOpacity>
+
+                  {/* Left Shift Button */}
+                  {index > 0 && (
+                    <TouchableOpacity style={styles.shiftLeftBtn} onPress={() => shiftImageLeft(index)} disabled={publishing}>
+                      <Text style={styles.arrowText}>←</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Right Shift Button */}
+                  {index < selectedImages.length - 1 && (
+                    <TouchableOpacity style={styles.shiftRightBtn} onPress={() => shiftImageRight(index)} disabled={publishing}>
+                      <Text style={styles.arrowText}>→</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <TouchableOpacity style={styles.removeBtn} onPress={() => removeImage(index)} disabled={publishing}>
+                    <X size={10} color="#FFF" />
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
           </ScrollView>
         )}
 
@@ -377,48 +671,32 @@ export default function OwnerUploadScreen() {
         {/* Transaction Type */}
         <View style={styles.pickerContainer}>
           <Text style={styles.pickerLabel}>Transaction Type</Text>
-          <View style={styles.pillRow}>
-            {[
-              { id: 'rent', label: 'Rent' },
-              { id: 'buy', label: 'Sale' },
-            ].map((type) => {
-              const active = listingType === type.id;
-              return (
-                <TouchableOpacity
-                  key={type.id}
-                  style={[styles.pill, active && styles.pillActive]}
-                  onPress={() => setListingType(type.id as any)}
-                  disabled={publishing}
-                >
-                  <Text style={[styles.pillText, active && styles.pillTextActive]}>
-                    For {type.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          <SegmentedSelector
+            options={[
+              { id: 'rent', label: 'For Rent' },
+              { id: 'buy', label: 'For Sale' },
+            ]}
+            selectedValue={listingType}
+            onSelect={(val) => setListingType(val as any)}
+            disabled={publishing}
+          />
         </View>
 
         {/* Lifecycle Status Selection */}
         <View style={styles.pickerContainer}>
           <Text style={styles.pickerLabel}>Listing Lifecycle Status</Text>
-          <View style={styles.pillRow}>
-            {['available', 'reserved', 'sold', 'rented', 'coming-soon'].map((s) => {
-              const active = status === s;
-              return (
-                <TouchableOpacity
-                  key={s}
-                  style={[styles.pill, active && styles.pillActive]}
-                  onPress={() => setStatus(s)}
-                  disabled={publishing}
-                >
-                  <Text style={[styles.pillText, active && styles.pillTextActive]}>
-                    {s.replace('-', ' ')}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          <SegmentedSelector
+            options={[
+              { id: 'available', label: 'available' },
+              { id: 'reserved', label: 'reserved' },
+              { id: 'sold', label: 'sold' },
+              { id: 'rented', label: 'rented' },
+              { id: 'coming-soon', label: 'coming soon' },
+            ]}
+            selectedValue={status}
+            onSelect={setStatus}
+            disabled={publishing}
+          />
         </View>
 
         <Input
@@ -441,7 +719,7 @@ export default function OwnerUploadScreen() {
         {/* Conditional Rental Fields */}
         {listingType === 'rent' && (
           <>
-            <View style={{ flexDirection: 'row', gap: Theme.spacing.md }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Theme.spacing.md }}>
               <Input
                 label="Security Deposit (INR)"
                 placeholder="e.g. 500000"
@@ -461,7 +739,7 @@ export default function OwnerUploadScreen() {
                 editable={!publishing}
               />
             </View>
-            <View style={{ flexDirection: 'row', gap: Theme.spacing.md }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Theme.spacing.md }}>
               <Input
                 label="Brokerage Charge (INR)"
                 placeholder="e.g. 0"
@@ -481,7 +759,7 @@ export default function OwnerUploadScreen() {
                 editable={!publishing}
               />
             </View>
-            <View style={{ flexDirection: 'row', gap: Theme.spacing.md }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Theme.spacing.md }}>
               <Input
                 label="Available From"
                 placeholder="e.g. Immediate"
@@ -492,23 +770,16 @@ export default function OwnerUploadScreen() {
               />
               <View style={{ flex: 1, gap: 4 }}>
                 <Text style={styles.pickerLabel}>Preferred Tenant</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
-                  {['anyone', 'family', 'bachelors'].map((tenant) => {
-                    const active = preferredTenant === tenant;
-                    return (
-                      <TouchableOpacity
-                        key={tenant}
-                        style={[styles.pill, active && styles.pillActive, { paddingVertical: 6, paddingHorizontal: 10 }]}
-                        onPress={() => setPreferredTenant(tenant as any)}
-                        disabled={publishing}
-                      >
-                        <Text style={[styles.pillText, { fontSize: 11 }, active && styles.pillTextActive]}>
-                          {tenant}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                <SegmentedSelector
+                  options={[
+                    { id: 'anyone', label: 'anyone' },
+                    { id: 'family', label: 'family' },
+                    { id: 'bachelors', label: 'bachelors' },
+                  ]}
+                  selectedValue={preferredTenant}
+                  onSelect={(val) => setPreferredTenant(val as any)}
+                  disabled={publishing}
+                />
               </View>
             </View>
           </>
@@ -517,7 +788,7 @@ export default function OwnerUploadScreen() {
         {/* Conditional Sale/Buy Fields */}
         {listingType === 'buy' && (
           <>
-            <View style={{ flexDirection: 'row', gap: Theme.spacing.md }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Theme.spacing.md }}>
               <Input
                 label="Carpet Area (Sq.ft)"
                 placeholder="e.g. 1100"
@@ -537,7 +808,7 @@ export default function OwnerUploadScreen() {
                 editable={!publishing}
               />
             </View>
-            <View style={{ flexDirection: 'row', gap: Theme.spacing.md }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Theme.spacing.md }}>
               <Input
                 label="Super Built-up (Sq.ft)"
                 placeholder="e.g. 1500"
@@ -557,7 +828,7 @@ export default function OwnerUploadScreen() {
                 editable={!publishing}
               />
             </View>
-            <View style={{ flexDirection: 'row', gap: Theme.spacing.md }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Theme.spacing.md }}>
               <Input
                 label="Property Age (Years)"
                 placeholder="e.g. 2"
@@ -569,44 +840,30 @@ export default function OwnerUploadScreen() {
               />
               <View style={{ flex: 1, gap: 4 }}>
                 <Text style={styles.pickerLabel}>Possession Status</Text>
-                <View style={{ flexDirection: 'row', gap: 4 }}>
-                  {['ready-to-move', 'under-construction'].map((pos) => {
-                    const active = possessionStatus === pos;
-                    return (
-                      <TouchableOpacity
-                        key={pos}
-                        style={[styles.pill, active && styles.pillActive, { paddingVertical: 6, paddingHorizontal: 8 }]}
-                        onPress={() => setPossessionStatus(pos as any)}
-                        disabled={publishing}
-                      >
-                        <Text style={[styles.pillText, { fontSize: 10 }, active && styles.pillTextActive]}>
-                          {pos.replace('-', ' ')}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                <SegmentedSelector
+                  options={[
+                    { id: 'ready-to-move', label: 'ready to move' },
+                    { id: 'under-construction', label: 'under construction' },
+                  ]}
+                  selectedValue={possessionStatus}
+                  onSelect={(val) => setPossessionStatus(val as any)}
+                  disabled={publishing}
+                />
               </View>
             </View>
             <View style={styles.pickerContainer}>
               <Text style={styles.pickerLabel}>Ownership Type</Text>
-              <View style={styles.pillRow}>
-                {['freehold', 'leasehold', 'co-operative', 'power-of-attorney'].map((o) => {
-                  const active = ownershipType === o;
-                  return (
-                    <TouchableOpacity
-                      key={o}
-                      style={[styles.pill, active && styles.pillActive]}
-                      onPress={() => setOwnershipType(o as any)}
-                      disabled={publishing}
-                    >
-                      <Text style={[styles.pillText, active && styles.pillTextActive]}>
-                        {o.replace('-', ' ')}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              <SegmentedSelector
+                options={[
+                  { id: 'freehold', label: 'freehold' },
+                  { id: 'leasehold', label: 'leasehold' },
+                  { id: 'co-operative', label: 'co-operative' },
+                  { id: 'power-of-attorney', label: 'power of attorney' },
+                ]}
+                selectedValue={ownershipType}
+                onSelect={(val) => setOwnershipType(val as any)}
+                disabled={publishing}
+              />
             </View>
           </>
         )}
@@ -660,79 +917,54 @@ export default function OwnerUploadScreen() {
         
         <View style={styles.pickerContainer}>
           <Text style={styles.pickerLabel}>Furnishing Status</Text>
-          <View style={styles.pillRow}>
-            {['unfurnished', 'semi-furnished', 'fully-furnished'].map((f) => {
-              const active = furnishing === f;
-              return (
-                <TouchableOpacity
-                  key={f}
-                  style={[styles.pill, active && styles.pillActive]}
-                  onPress={() => setFurnishing(f)}
-                  disabled={publishing}
-                >
-                  <Text style={[styles.pillText, active && styles.pillTextActive]}>
-                    {f.replace('-', ' ')}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          <SegmentedSelector
+            options={[
+              { id: 'unfurnished', label: 'unfurnished' },
+              { id: 'semi-furnished', label: 'semi-furnished' },
+              { id: 'fully-furnished', label: 'fully-furnished' },
+            ]}
+            selectedValue={furnishing}
+            onSelect={setFurnishing}
+            disabled={publishing}
+          />
         </View>
 
         <View style={styles.pickerContainer}>
           <Text style={styles.pickerLabel}>Property Type</Text>
-          <View style={styles.pillRow}>
-            {['apartment', 'house', 'villa'].map((t) => {
-              const active = propertyType === t;
-              return (
-                <TouchableOpacity
-                  key={t}
-                  style={[styles.pill, active && styles.pillActive]}
-                  onPress={() => setPropertyType(t)}
-                  disabled={publishing}
-                >
-                  <Text style={[styles.pillText, active && styles.pillTextActive]}>
-                    {t}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          <SegmentedSelector
+            options={[
+              { id: 'apartment', label: 'apartment' },
+              { id: 'house', label: 'house' },
+              { id: 'villa', label: 'villa' },
+            ]}
+            selectedValue={propertyType}
+            onSelect={setPropertyType}
+            disabled={publishing}
+          />
         </View>
 
         {/* Structured Amenities Selection */}
         <View style={styles.pickerContainer}>
-          <Text style={styles.pickerLabel}>Structured Amenities Selection</Text>
+          <Text style={styles.pickerLabel}>Amenities & Features</Text>
           {Object.entries(AMENITY_CATEGORIES).map(([catId, catLabel]) => {
             const categoryAmenities = AMENITIES.filter(a => a.category === catId);
             return (
-              <View key={catId} style={{ marginTop: Theme.spacing.sm, gap: 4 }}>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: Theme.colors.textSecondary }}>
+              <View key={catId} style={{ marginTop: Theme.spacing.sm, gap: 6 }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: Theme.colors.textSecondary, fontFamily: Theme.typography.fontFamilyMedium }}>
                   {catLabel}
                 </Text>
-                <View style={styles.pillRow}>
-                  {categoryAmenities.map((amenity) => {
-                    const active = selectedAmenities.includes(amenity.id);
-                    return (
-                      <TouchableOpacity
-                        key={amenity.id}
-                        style={[styles.pill, active && styles.pillActive]}
-                        onPress={() => {
-                          setSelectedAmenities(prev =>
-                            prev.includes(amenity.id)
-                              ? prev.filter(id => id !== amenity.id)
-                              : [...prev, amenity.id]
-                          );
-                        }}
-                        disabled={publishing}
-                      >
-                        <Text style={[styles.pillText, active && styles.pillTextActive]}>
-                          {amenity.label}
-                        </Text>
-                      </TouchableOpacity>
+                <TagCarousel
+                  options={categoryAmenities.map(a => ({ id: a.id, label: a.label }))}
+                  selectedValues={selectedAmenities}
+                  onToggle={(id) => {
+                    setSelectedAmenities(prev =>
+                      prev.includes(id)
+                        ? prev.filter(x => x !== id)
+                        : [...prev, id]
                     );
-                  })}
-                </View>
+                  }}
+                  disabled={publishing}
+                />
               </View>
             );
           })}
@@ -743,36 +975,6 @@ export default function OwnerUploadScreen() {
         </Button>
       </View>
 
-      {/* Blocking Publishing Overlay */}
-      {publishing && (
-        <View style={styles.overlayContainer}>
-          <View style={styles.overlayCard}>
-            <ActivityIndicator size="large" color={Theme.colors.primary} />
-            <Text style={styles.overlayTitle}>{publishingStage}</Text>
-            <Text style={styles.overlaySub}>Please keep the app open during uploads.</Text>
-            
-            {imageUploadProgress > 0 && (
-              <View style={styles.progressRow}>
-                <Text style={styles.progressLabel}>Images:</Text>
-                <View style={styles.progressBarBg}>
-                  <View style={[styles.progressBarFill, { width: `${imageUploadProgress}%` }]} />
-                </View>
-                <Text style={styles.progressPct}>{imageUploadProgress}%</Text>
-              </View>
-            )}
-
-            {videoUploadProgress > 0 && (
-              <View style={styles.progressRow}>
-                <Text style={styles.progressLabel}>Video:</Text>
-                <View style={styles.progressBarBg}>
-                  <View style={[styles.progressBarFill, { width: `${videoUploadProgress}%` }]} />
-                </View>
-                <Text style={styles.progressPct}>{videoUploadProgress}%</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      )}
     </ScreenContainer>
   );
 }
@@ -912,70 +1114,162 @@ const styles = StyleSheet.create({
     marginTop: Theme.spacing.lg,
     width: '100%',
   },
-  // Blocking overlay stylesheet
-  overlayContainer: {
+  // Drag, drop, shift and cover styling
+  previewWrapperCover: {
+    borderColor: Theme.colors.primary,
+    borderWidth: 2,
+  },
+  coverTag: {
     position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(10, 10, 11, 0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Theme.spacing.xxl,
-  },
-  overlayCard: {
-    width: '100%',
-    backgroundColor: Theme.colors.surface,
-    borderRadius: Theme.borderRadius.lg,
+    top: 4,
+    left: 4,
+    backgroundColor: 'rgba(10, 10, 11, 0.75)',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     borderWidth: 1,
-    borderColor: Theme.colors.border,
-    padding: Theme.spacing.xl,
-    alignItems: 'center',
-    gap: Theme.spacing.md,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    zIndex: 5,
   },
-  overlayTitle: {
-    fontSize: Theme.typography.sizes.lg,
-    color: Theme.colors.textPrimary,
+  coverTagActive: {
+    backgroundColor: Theme.colors.primary,
+    borderColor: Theme.colors.primary,
+  },
+  coverTagText: {
+    color: '#FFF',
+    fontSize: 9,
     fontFamily: Theme.typography.fontFamilyBold,
-    textAlign: 'center',
-    marginTop: Theme.spacing.sm,
   },
-  overlaySub: {
-    fontSize: Theme.typography.sizes.xs,
-    color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
-    textAlign: 'center',
-    marginBottom: Theme.spacing.md,
-  },
-  progressRow: {
-    width: '100%',
-    flexDirection: 'row',
+  shiftLeftBtn: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(10, 10, 11, 0.75)',
     alignItems: 'center',
-    gap: Theme.spacing.sm,
+    justifyContent: 'center',
+    zIndex: 5,
   },
-  progressLabel: {
-    width: 60,
-    fontSize: Theme.typography.sizes.xs,
-    color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
+  shiftRightBtn: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(10, 10, 11, 0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 5,
   },
-  progressBarBg: {
+  arrowText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontFamily: Theme.typography.fontFamilyBold,
+  },
+  
+  // Publishing checklist screen stylesheet
+  publishingContent: {
     flex: 1,
-    height: 6,
-    backgroundColor: Theme.colors.backgroundSecondary,
-    borderRadius: Theme.borderRadius.full,
-    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Theme.spacing.xl,
+    paddingVertical: Theme.spacing.xxxl,
   },
-  progressBarFill: {
+  publishingTitle: {
+    fontSize: Theme.typography.sizes.h2,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
+    color: Theme.colors.textPrimary,
+    textAlign: 'center',
+  },
+  publishingSubtitle: {
+    fontSize: Theme.typography.sizes.sm,
+    fontFamily: Theme.typography.fontFamily,
+    color: Theme.colors.textSecondary,
+    textAlign: 'center',
+    marginTop: Theme.spacing.xs,
+    marginBottom: Theme.spacing.xl,
+  },
+  progressTrack: {
+    width: '100%',
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: Theme.spacing.xs,
+  },
+  progressIndicatorFill: {
     height: '100%',
     backgroundColor: Theme.colors.primary,
   },
-  progressPct: {
-    width: 35,
+  progressPercentText: {
     fontSize: Theme.typography.sizes.xs,
-    color: Theme.colors.textPrimary,
     fontFamily: Theme.typography.fontFamilyBold,
-    textAlign: 'right',
+    color: Theme.colors.textSecondary,
+    marginBottom: Theme.spacing.xl,
+  },
+  checklist: {
+    width: '100%',
+    backgroundColor: '#151518',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    padding: Theme.spacing.md,
+    gap: Theme.spacing.sm,
+    marginBottom: Theme.spacing.xl,
+  },
+  checklistItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Theme.spacing.md,
+    paddingVertical: 4,
+  },
+  checklistPending: {
+    opacity: 0.4,
+  },
+  checkIconWrapper: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Theme.colors.textSecondary,
+  },
+  checklistLabel: {
+    fontSize: Theme.typography.sizes.sm,
+    fontFamily: Theme.typography.fontFamilySemiBold,
+    color: Theme.colors.textPrimary,
+  },
+  checklistCompletedLabel: {
+    color: Theme.colors.textSecondary,
+    textDecorationLine: 'line-through',
+  },
+  errorContainer: {
+    width: '100%',
+    backgroundColor: 'rgba(255, 59, 48, 0.08)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 59, 48, 0.2)',
+    padding: Theme.spacing.md,
+    alignItems: 'center',
+  },
+  errorTitle: {
+    fontSize: Theme.typography.sizes.md,
+    fontFamily: Theme.typography.fontFamilyBold,
+    color: '#FF3B30',
+  },
+  errorText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontFamily: Theme.typography.fontFamily,
+    color: Theme.colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 16,
   },
 });

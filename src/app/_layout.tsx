@@ -135,6 +135,10 @@ export default function RootLayout() {
                       options={{ presentation: 'modal' }}
                     />
                     <Stack.Screen
+                      name="owner/success"
+                      options={{ presentation: 'card' }}
+                    />
+                    <Stack.Screen
                       name="settings"
                       options={{ presentation: 'card' }}
                     />

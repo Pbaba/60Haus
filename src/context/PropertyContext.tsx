@@ -6,10 +6,12 @@ import { SearchFilters } from '../components/SearchOverlay';
 import { propertyService } from '../services/propertyService';
 import { discoveryService } from '../services/discoveryService';
 import { propertyUploadService, VideoAsset } from '../services/propertyUploadService';
+import { PipelineProgress } from '../media/MediaTypes';
+import { PipelineEventBus } from '../media/PipelineEventBus';
+import { UploadManager } from '../media/UploadManager';
 import { bookmarkService } from '../services/bookmarkService';
 import { historyService } from '../services/historyService';
 import { collectionService } from '../services/collectionService';
-import { enrichPropertyListing } from '../utils/propertyIntelligence';
 import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../hooks/useProfile';
 import { useFeedback } from './FeedbackContext';
@@ -26,7 +28,7 @@ interface PropertyContextType {
     imageUrls: string[],
     videoUri?: string,
     videoAssetInfo?: VideoAsset
-  ) => Promise<void>;
+  ) => Promise<string>;
   updateListing: (
     id: string,
     updates: Omit<PropertyListing, 'id' | 'createdAt'>,
@@ -48,6 +50,7 @@ interface PropertyContextType {
   videoUploadProgress: number;
   publishing: boolean;
   publishingStage: string;
+  publishingProgress: PipelineProgress | null;
   discoveryMode: DiscoveryMode;
   setDiscoveryMode: (mode: DiscoveryMode) => void;
   hasExactMatchesRemaining: boolean;
@@ -141,6 +144,7 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [videoUploadProgress, setVideoUploadProgress] = useState(0);
   const [publishing, setPublishing] = useState(false);
   const [publishingStage, setPublishingStage] = useState('');
+  const [publishingProgress, setPublishingProgress] = useState<PipelineProgress | null>(null);
   
   const [discoveryMode, setDiscoveryModeState] = useState<DiscoveryMode>(DiscoveryMode.EXACT_MATCH);
   const [flexibleLevel, setFlexibleLevel] = useState(1);
@@ -350,136 +354,40 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     videoAssetInfo?: VideoAsset
   ) => {
     setPublishing(true);
-    setPublishingStage('Publishing Listing');
+    setPublishingProgress({ stage: 'idle', progress: 0, completedStages: [] });
     setImageUploadProgress(0);
     setVideoUploadProgress(0);
 
-    let propertyId = '';
-    const uploadedPaths: { bucket: string; path: string }[] = [];
+    const unsubscribe = PipelineEventBus.subscribe((event, overallProgress) => {
+      setPublishingStage(event.details || event.stage);
+      setPublishingProgress(overallProgress);
+    });
 
     try {
-      if (videoUri && videoAssetInfo) {
-        setPublishingStage('Validating Video');
-        propertyUploadService.validateVideo({ ...videoAssetInfo, uri: videoUri });
-      }
-
-      setPublishingStage('Publishing Listing');
-      propertyId = await propertyService.createListingPlaceholder(newListing);
-
-      setPublishingStage('Compressing Images');
-      const optimizedImages = await propertyUploadService.compressImages(imageUrls);
-
-      setPublishingStage('Uploading Images');
-      const uploadedImages = await propertyUploadService.uploadImages(
-        propertyId,
-        optimizedImages,
-        (progress) => {
-          setImageUploadProgress(progress);
-        }
+      const uploadManager = new UploadManager();
+      const propertyId = await uploadManager.publishListing(
+        newListing,
+        imageUrls,
+        videoUri || null,
+        videoAssetInfo?.duration || undefined
       );
-      uploadedPaths.push(...uploadedImages.map(img => ({ bucket: img.bucket, path: img.path })));
-      const finalImageUrls = uploadedImages.map(img => img.publicUrl);
-
-      let uploadedVideoUrl = '';
-      let generatedThumbnail = '';
-
-      if (videoUri) {
-        setPublishingStage('Generating Thumbnail');
-        const thumbFile = await propertyUploadService.uploadThumbnail(propertyId, videoUri);
-        uploadedPaths.push({ bucket: thumbFile.bucket, path: thumbFile.path });
-        generatedThumbnail = thumbFile.publicUrl;
-
-        setPublishingStage('Uploading Video');
-        const videoFile = await propertyUploadService.uploadVideo(
-          propertyId,
-          videoUri,
-          (progress) => {
-            setVideoUploadProgress(progress);
-          }
-        );
-        uploadedPaths.push({ bucket: videoFile.bucket, path: videoFile.path });
-        uploadedVideoUrl = videoFile.publicUrl;
-      }
-
-      setPublishingStage('Finalizing');
-      const finalThumb = generatedThumbnail || finalImageUrls[0] || newListing.thumbnailUrl;
-      await propertyService.updateListingUrls(
-        propertyId,
-        finalImageUrls,
-        uploadedVideoUrl,
-        finalThumb
-      );
-
-      const newProperty = enrichPropertyListing({
-        id: propertyId,
-        ownerId: newListing.ownerId,
-        title: newListing.title,
-        description: newListing.description,
-        price: Number(newListing.price),
-        listingType: newListing.listingType,
-        city: newListing.city,
-        address: newListing.address,
-        bedrooms: newListing.bedrooms,
-        bathrooms: newListing.bathrooms,
-        furnishing: newListing.furnishing,
-        thumbnailUrl: finalThumb,
-        videoUrl: uploadedVideoUrl,
-        createdAt: new Date().toISOString(),
-        imageUrls: finalImageUrls,
-        amenities: newListing.amenities || [],
-        viewCount: 0,
-        saveCount: 0,
-        contactCount: 0,
-        propertyType: newListing.propertyType,
-        locality: newListing.locality,
-        carpetArea: newListing.carpetArea,
-        builtUpArea: newListing.builtUpArea,
-        superBuiltUpArea: newListing.superBuiltUpArea,
-        plotArea: newListing.plotArea,
-        propertyAge: newListing.propertyAge,
-        possessionStatus: newListing.possessionStatus,
-        ownershipType: newListing.ownershipType,
-        securityDeposit: newListing.securityDeposit,
-        monthlyMaintenance: newListing.monthlyMaintenance,
-        brokerage: newListing.brokerage,
-        leaseDuration: newListing.leaseDuration,
-        availableFrom: newListing.availableFrom,
-        preferredTenant: newListing.preferredTenant,
-        status: newListing.status || 'published',
-      });
 
       feedCache = {};
-      setProperties((prev) => [newProperty, ...prev]);
-      
+      setProperties([]);
       await fetchFeed();
       
       hapticsService.success();
-      setPublishingStage('Success');
-      showTransactionFeedback('success', 'Listing Published', 'Your property listing has been successfully uploaded and published to the live marketplace.');
-    } catch (e) {
-      console.error('Publishing pipeline transaction failed, starting rollback:', e);
-      setPublishingStage('Failure');
+      setPublishingProgress(prev => prev ? { ...prev, stage: 'completed', progress: 100 } : null);
+      showTransactionFeedback('success', 'Listing Published', 'Your property listing has been successfully uploaded and published.');
+      
+      return propertyId;
+    } catch (e: any) {
+      console.error('Publishing failed:', e);
       hapticsService.error();
-      showTransactionFeedback('error', 'Publish Failed', 'Failed to upload media assets. Please verify file sizes, formats, and connection stability.');
-
-      if (propertyId) {
-        try {
-          await propertyService.deleteListingHard(propertyId);
-        } catch (dbErr) {
-          console.warn('Rollback hard-delete database record failed:', dbErr);
-        }
-      }
-
-      if (uploadedPaths.length > 0) {
-        try {
-          await propertyUploadService.cleanupUploads(uploadedPaths);
-        } catch (storageErr) {
-          console.warn('Rollback delete storage files failed:', storageErr);
-        }
-      }
-
+      showTransactionFeedback('error', 'Publish Failed', e.message || 'Failed to upload media assets.');
       throw e;
     } finally {
+      unsubscribe();
       setPublishing(false);
     }
   }, [fetchFeed, showTransactionFeedback]);
@@ -498,58 +406,30 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setVideoUploadProgress(0);
 
     try {
-      if (videoUri && videoAssetInfo && (videoUri.startsWith('file://') || videoUri.startsWith('content://'))) {
-        setPublishingStage('Validating Video');
-        propertyUploadService.validateVideo({ ...videoAssetInfo, uri: videoUri });
-      }
-
-      const previousProperty = properties.find(p => p.id === id);
-      const currentImages = previousProperty?.imageUrls || [];
-      const currentVideo = previousProperty?.videoUrl || '';
-
-      setPublishingStage('Synchronizing Media');
-      const mediaResult = await propertyUploadService.syncMedia(
+      const uploadManager = new UploadManager();
+      await uploadManager.updateListing(
         id,
-        currentImages,
+        updates,
         imageUrls,
-        currentVideo,
         videoUri || undefined,
-        (progress) => {
-          setImageUploadProgress(progress);
-        }
-      );
-
-      setPublishingStage('Finalizing');
-      const finalThumb = mediaResult.thumbnailUrl || mediaResult.imageUrls[0] || updates.thumbnailUrl;
-      
-      const updatedProperty = await propertyService.updateListing(
-        id,
-        {
-          ...updates,
-          thumbnailUrl: finalThumb,
-        },
-        mediaResult.imageUrls,
-        mediaResult.videoUrl,
-        finalThumb
+        videoAssetInfo
       );
 
       feedCache = {};
-      setProperties((prev) => prev.map((item) => (item.id === id ? updatedProperty : item)));
-      
       await fetchFeed();
       hapticsService.success();
       setPublishingStage('Success');
-      showTransactionFeedback('success', 'Listing Updated', 'Your property details and media edits have been successfully synced and updated.');
-    } catch (e) {
+      showTransactionFeedback('success', 'Listing Updated', 'Your listing has been successfully updated.');
+    } catch (e: any) {
       console.error('Update transaction failed:', e);
       setPublishingStage('Failure');
       hapticsService.error();
-      showTransactionFeedback('error', 'Update Failed', 'Failed to update property details. Please verify changes and try again.');
+      showTransactionFeedback('error', 'Update Failed', e.message || 'Failed to update listing.');
       throw e;
     } finally {
       setPublishing(false);
     }
-  }, [properties, fetchFeed, showTransactionFeedback]);
+  }, [fetchFeed, showTransactionFeedback]);
 
   // Deletion sequence: Retrieve URLs -> Delete Storage media -> Delete Database record -> Invalidate & refresh
   const deleteListing = useCallback(async (id: string) => {
@@ -772,6 +652,7 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     videoUploadProgress,
     publishing,
     publishingStage,
+    publishingProgress,
     discoveryMode,
     setDiscoveryMode,
     hasExactMatchesRemaining,
@@ -809,6 +690,7 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     videoUploadProgress,
     publishing,
     publishingStage,
+    publishingProgress,
     discoveryMode,
     setDiscoveryMode,
     hasExactMatchesRemaining,
