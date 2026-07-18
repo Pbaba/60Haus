@@ -16,10 +16,9 @@ import {
 import { useRouter } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SavedSearchPanel } from '../../components/SavedSearchPanel';
 import { useAuth } from '../../hooks/useAuth';
 import { Image } from 'expo-image';
-import { Search, Award, Share2, Heart, GitCompare, ArrowRight } from 'lucide-react-native';
+import { Award, Share2, Heart, GitCompare, ArrowRight } from 'lucide-react-native';
 import { useFeedback } from '../../context/FeedbackContext';
 import { profileService } from '../../services/profileService';
 import { ScreenContainer } from '../../components/ScreenContainer';
@@ -32,13 +31,11 @@ import { locationDomain, reactNativeMapProvider, NeighborhoodSnapshot } from '..
 import { Input } from '../../components/Input';
 import { Avatar } from '../../components/Avatar';
 import { BottomSheet } from '../../components/BottomSheet';
-import { FeedbackState } from '../../components/FeedbackState';
 import { useProperties } from '../../hooks/useProperties';
 import { Theme } from '../../theme';
 import { formatCurrency } from '../../utils';
 import { PropertyListing, DiscoveryMode } from '../../types';
 import { SearchFilters } from '../../components/SearchOverlay';
-import { hapticsService } from '../../services/hapticsService';
 import { reportService } from '../../services/reportService';
 import { analyticsService } from '../../services/analyticsService';
 
@@ -71,11 +68,9 @@ export default function FeedScreen() {
     loadMoreFeed,
     incrementViewCount,
     discoveryMode,
-    setDiscoveryMode,
     hasExactMatchesRemaining,
     incrementContactCount,
     filters,
-    setFilters,
     compareQueue,
     toggleCompare,
     collections,
@@ -99,8 +94,6 @@ export default function FeedScreen() {
   const [selectedProperty, setSelectedProperty] = useState<PropertyListing | null>(null);
   const [activeIdx, setActiveIdx] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
-  const [resumeState, setResumeState] = useState<ResumeBrowsingState | null>(null);
-  const [showResumeCard, setShowResumeCard] = useState(false);
 
   // Collections modal states
   const [saveModalVisible, setSaveModalVisible] = useState(false);
@@ -254,24 +247,6 @@ export default function FeedScreen() {
   const [reportDetails, setReportDetails] = useState('');
   const [submittingReport, setSubmittingReport] = useState(false);
 
-  // Load saved session on mount
-  useEffect(() => {
-    const checkResumeProgress = async () => {
-      try {
-        const saved = await AsyncStorage.getItem('@resume_browsing_state');
-        if (saved) {
-          const parsed: ResumeBrowsingState = JSON.parse(saved);
-          if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
-            setResumeState(parsed);
-            setShowResumeCard(true);
-          }
-        }
-      } catch {
-        console.warn('Failed to load resume state');
-      }
-    };
-    checkResumeProgress();
-  }, []);
 
   // Save active progress in background when index changes
   useEffect(() => {
@@ -292,47 +267,12 @@ export default function FeedScreen() {
     }
   }, [activeIdx, filteredProperties, filters, discoveryMode]);
 
-  const handleResume = async () => {
-    if (!resumeState) return;
-    hapticsService.success();
-    setShowResumeCard(false);
-
-    setFilters(resumeState.filters);
-    setDiscoveryMode(resumeState.discoveryMode);
-    
-    await fetchFeed();
-
-    setTimeout(() => {
-      const idx = filteredProperties.findIndex((p) => p.id === resumeState.propertyId);
-      if (idx !== -1) {
-        listRef.current?.scrollToIndex({ index: idx, animated: true });
-        setActiveIdx(idx);
-      } else {
-        listRef.current?.scrollToIndex({ index: 0, animated: true });
-        setActiveIdx(0);
-        showToast('Saved listing is no longer available; starting from the top.', 'info');
-      }
-    }, 850);
-  };
 
   const getWelcomeGreeting = () => {
     const hour = new Date().getHours();
-    let greeting = 'Welcome back';
-    if (hour < 12) greeting = 'Good morning';
-    else if (hour < 18) greeting = 'Good afternoon';
-    else greeting = 'Good evening';
-
-    const matchCount = filteredProperties.filter(p => !(p as any).isEndCard).length;
-    const localityName = filters.localities && filters.localities[0] || filters.city;
-
-    const messages = [
-      `${greeting}. ${matchCount} new homes match your preferences.`,
-      `${greeting}. 3 new listings were added in ${localityName} today.`,
-      `You've got ${matchCount} new recommendations since yesterday.`,
-    ];
-
-    const idx = new Date().getDate() % messages.length;
-    return messages[idx];
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
   };
 
   const SinceLastVisitCard: React.FC = () => {
@@ -530,94 +470,6 @@ export default function FeedScreen() {
       safeAreaBottom={false}
       style={styles.container}
     >
-      {/* Floating Filters Header */}
-      {!loading && listData.length > 0 && (
-        <View style={styles.floatingHeader}>
-          {activeIdx === 0 && (
-            <>
-              {/* Dynamic Welcome Back Text */}
-              <Text style={styles.welcomeGreeting}>{getWelcomeGreeting()}</Text>
-
-              {/* Resume Browsing Progress Card */}
-              {showResumeCard && resumeState && (
-                <View style={styles.resumeCard}>
-                  <View style={styles.resumeTextCol}>
-                    <Text style={styles.resumeCardTitle}>Continue where you left off</Text>
-                    <Text style={styles.resumeCardDesc}>
-                      Property {resumeState.propertyId.slice(-4)} • {resumeState.propertyLocality || resumeState.filters.city}
-                    </Text>
-                  </View>
-                  <View style={styles.resumeActionRow}>
-                    <TouchableOpacity style={styles.resumeBtn} onPress={handleResume}>
-                      <Text style={styles.resumeBtnText}>Resume</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.resumeDismissBtn}
-                      onPress={() => {
-                        hapticsService.light();
-                        setShowResumeCard(false);
-                      }}
-                    >
-                      <Text style={styles.resumeDismissText}>✕</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-
-              {/* Saved Search Profiles Selector */}
-              <SavedSearchPanel
-                currentFilters={filters}
-                onApplyFilters={(newFilters) => {
-                  setFilters(newFilters);
-                  fetchFeed(); // reload feed and bypass cache
-                }}
-              />
-            </>
-          )}
-
-          {/* Quick Filters Chips */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipsScroll}
-          >
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={styles.searchButton}
-              onPress={() => router.push('/search' as any)}
-            >
-              <Search size={18} color="#FFF" />
-            </TouchableOpacity>
-
-            <View style={styles.chip}>
-              <Text style={styles.chipText}>{filters.city}</Text>
-            </View>
-
-            <View style={styles.chip}>
-              <Text style={styles.chipText}>For {filters.listingType === 'rent' ? 'Rent' : 'Buy'}</Text>
-            </View>
-
-            {filters.bhk && (
-              <View style={styles.chip}>
-                <Text style={styles.chipText}>{filters.bhk} BHK</Text>
-              </View>
-            )}
-
-            {filters.furnishing && (
-              <View style={styles.chip}>
-                <Text style={styles.chipText}>{filters.furnishing.replace('-', ' ')}</Text>
-              </View>
-            )}
-
-            {filters.petFriendly && (
-              <View style={styles.chip}>
-                <Text style={styles.chipText}>Pet Friendly 🐾</Text>
-              </View>
-            )}
-          </ScrollView>
-        </View>
-      )}
-
       {loading ? (
         <SkeletonFeed />
       ) : listData.length > 0 ? (
@@ -645,12 +497,35 @@ export default function FeedScreen() {
           }
         />
       ) : (
-        <FeedbackState
-          type={properties.length === 0 ? 'empty-feed' : 'empty-search'}
-          title={properties.length === 0 ? 'No listings available yet.' : 'No Search Results'}
-          onRetry={properties.length === 0 ? handleRefresh : undefined}
-          actionText="Refresh Feed"
-        />
+        <View style={styles.emptyContainer}>
+          <View style={styles.emptyHeaderSection}>
+            <Text style={styles.emptyGreeting}>{getWelcomeGreeting()}</Text>
+            <Text style={styles.emptySubtitle}>Find your next home.</Text>
+            <Button
+              variant="primary"
+              style={styles.emptyActionBtn}
+              onPress={() => router.replace('/(tabs)/discover' as any)}
+            >
+              Discover Properties
+            </Button>
+          </View>
+
+          <View style={styles.emptyDivider} />
+
+          <View style={styles.emptyBodySection}>
+            <Text style={styles.emptyFeedbackTitle}>No listings available yet.</Text>
+            <Text style={styles.emptyFeedbackSubtitle}>
+              Try adjusting your search or check back later.
+            </Text>
+            <Button
+              variant="secondary"
+              style={styles.emptyActionBtn}
+              onPress={handleRefresh}
+            >
+              Refresh Feed
+            </Button>
+          </View>
+        </View>
       )}
 
       {/* Property Details Bottom Sheet Overlay */}
@@ -2083,5 +1958,60 @@ const styles = StyleSheet.create({
     fontSize: Theme.typography.sizes.xs,
     fontFamily: Theme.typography.fontFamilyBold,
     color: Theme.colors.background,
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Theme.spacing.xxl,
+    backgroundColor: Theme.colors.background,
+  },
+  emptyHeaderSection: {
+    width: '100%',
+    alignItems: 'center',
+    gap: Theme.spacing.xs,
+    paddingVertical: Theme.spacing.lg,
+  },
+  emptyGreeting: {
+    fontSize: Theme.typography.sizes.h2,
+    fontFamily: Theme.typography.fontFamilyEditorialBold,
+    color: Theme.colors.textPrimary,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: Theme.typography.sizes.md,
+    fontFamily: Theme.typography.fontFamily,
+    color: Theme.colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: Theme.spacing.sm,
+  },
+  emptyActionBtn: {
+    minWidth: 200,
+    marginTop: Theme.spacing.xs,
+  },
+  emptyDivider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: Theme.colors.border,
+    marginVertical: Theme.spacing.xxl,
+  },
+  emptyBodySection: {
+    width: '100%',
+    alignItems: 'center',
+    gap: Theme.spacing.xs,
+    paddingVertical: Theme.spacing.lg,
+  },
+  emptyFeedbackTitle: {
+    fontSize: Theme.typography.sizes.md,
+    fontFamily: Theme.typography.fontFamilySemiBold,
+    color: Theme.colors.textPrimary,
+    textAlign: 'center',
+  },
+  emptyFeedbackSubtitle: {
+    fontSize: Theme.typography.sizes.sm,
+    fontFamily: Theme.typography.fontFamily,
+    color: Theme.colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: Theme.spacing.sm,
   },
 });

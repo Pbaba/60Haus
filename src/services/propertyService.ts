@@ -106,6 +106,49 @@ export const propertyService = {
     }
   },
 
+  // Get property listing by ID
+  async getListing(id: string): Promise<PropertyListing | null> {
+    const { data, error } = await supabase
+      .from('properties')
+      .select('*, property_images(image_url), property_videos(video_url, thumbnail_url)')
+      .eq('id', id)
+      .single();
+
+    if (error || !data) return null;
+    const videoRecord = data.property_videos && data.property_videos[0];
+    
+    return {
+      id: data.id,
+      ownerId: data.owner_id,
+      title: data.title,
+      description: data.description,
+      price: Number(data.price),
+      listingType: data.listing_type,
+      city: data.city,
+      address: data.address,
+      bedrooms: data.bedrooms,
+      bathrooms: data.bathrooms,
+      furnishing: data.furnishing,
+      thumbnailUrl: videoRecord?.thumbnail_url || data.thumbnail_url,
+      videoUrl: videoRecord?.video_url || '',
+      createdAt: data.created_at,
+      imageUrls: data.property_images ? data.property_images.map((img: any) => img.image_url) : [],
+      status: data.status,
+      propertyType: data.property_type,
+      locality: data.locality,
+    };
+  },
+
+  // Update listing status
+  async updateListingStatus(id: string, status: 'pending' | 'published' | 'archived'): Promise<void> {
+    const { error } = await supabase
+      .from('properties')
+      .update({ status })
+      .eq('id', id);
+
+    if (error) throw error;
+  },
+
   // Hard delete property
   async deleteListingHard(id: string): Promise<void> {
     const { error } = await supabase
