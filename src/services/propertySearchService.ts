@@ -11,7 +11,7 @@ export const propertySearchService = {
     filters?: SearchFilters
   ): Promise<PropertyListing[]> {
     let query = supabase
-      .from('properties')
+      .from('ranked_feed_listings')
       .select('*, property_images(image_url), property_videos(video_url, thumbnail_url)')
       .eq('status', 'published')
       .is('deleted_at', null);
@@ -100,10 +100,10 @@ export const propertySearchService = {
           query = query.order('price', { ascending: false });
           break;
         default:
-          query = query.order('created_at', { ascending: false });
+          query = query.order('dynamic_trust_rank', { ascending: false }).order('created_at', { ascending: false });
       }
     } else {
-      query = query.order('created_at', { ascending: false });
+      query = query.order('dynamic_trust_rank', { ascending: false }).order('created_at', { ascending: false });
     }
 
     // Limit chunk size
@@ -136,6 +136,11 @@ export const propertySearchService = {
         viewCount: item.view_count || 0,
         is_sponsored: item.is_sponsored,
         priority_score: item.priority_score,
+        dynamicTrustRank: item.dynamic_trust_rank,
+        healthScore: item.health_score,
+        healthStatus: item.health_status,
+        healthBreakdown: item.health_breakdown,
+        lastIntegrityCheckAt: item.last_integrity_check_at,
         carpetArea: item.carpet_area ? Number(item.carpet_area) : undefined,
         builtUpArea: item.built_up_area ? Number(item.built_up_area) : undefined,
         superBuiltUpArea: item.super_built_up_area ? Number(item.super_built_up_area) : undefined,

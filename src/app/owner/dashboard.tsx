@@ -265,6 +265,62 @@ export default function OwnerDashboardScreen() {
           )}
         </View>
 
+        {/* Marketplace Integrity & Verification */}
+        <View style={styles.verificationContainer}>
+          <Text style={styles.verificationTitle}>Marketplace Health</Text>
+          
+          <View style={styles.verificationRow}>
+            <View style={styles.verificationInfo}>
+              <Text style={styles.verificationLabel}>
+                {item.healthStatus === 'excellent' ? 'Excellent Health' :
+                 item.healthStatus === 'good' ? 'Good Health' :
+                 item.healthStatus === 'needs_attention' ? 'Needs Attention' : 
+                 item.healthStatus === 'poor' ? 'Poor Health' : 'Health Score Pending'}
+              </Text>
+              {item.healthBreakdown && Object.keys(item.healthBreakdown).length > 0 && (
+                <Text style={styles.verificationDate}>
+                  {Object.values(item.healthBreakdown)[0] as string}
+                </Text>
+              )}
+            </View>
+          </View>
+
+          <View style={[styles.verificationRow, { marginTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', paddingTop: 12 }]}>
+            <View style={styles.verificationInfo}>
+              <Text style={styles.verificationLabel}>
+                {item.verificationStatus === 'inactive_unverified' ? 'Deactivated (Unverified)' : 
+                 item.verificationStatus === 'awaiting_verification' ? 'Verification Due' :
+                 item.verificationStatus === 'grace_period' ? 'Verification Overdue' : 'Active'}
+              </Text>
+              <Text style={styles.verificationDate}>
+                {item.lastVerifiedAt 
+                  ? `Last verified: ${new Date(item.lastVerifiedAt).toLocaleDateString()}` 
+                  : 'Not verified yet'}
+              </Text>
+            </View>
+            
+            {item.verificationStatus === 'inactive_unverified' && (
+              <Button
+                variant="primary"
+                style={styles.reactivateBtn}
+                onPress={async () => {
+                  setDialogLoading(true);
+                  try {
+                    await propertyService.submitVerification(item.id, profile!.id, 'verified_available', item.nextVerificationAt || new Date().toISOString());
+                    await fetchDashboardStats();
+                  } catch (e: any) {
+                    alert('Failed to reactivate: ' + e.message);
+                  } finally {
+                    setDialogLoading(false);
+                  }
+                }}
+              >
+                Reactivate
+              </Button>
+            )}
+          </View>
+        </View>
+
         {/* Action Controls */}
         <View style={styles.actionButtons}>
           <Button
@@ -779,5 +835,45 @@ const styles = StyleSheet.create({
     fontFamily: Theme.typography.fontFamilyBold,
     marginTop: 2,
     color: Theme.colors.textPrimary,
+  },
+  verificationContainer: {
+    padding: Theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Theme.colors.border,
+    backgroundColor: 'rgba(255, 255, 255, 0.01)',
+    gap: 4,
+    borderRadius: Theme.borderRadius.sm,
+  },
+  verificationTitle: {
+    fontSize: Theme.typography.sizes.xs,
+    color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamilyBold,
+    textTransform: 'uppercase',
+    letterSpacing: Theme.typography.letterSpacing.wide,
+  },
+  verificationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  verificationInfo: {
+    flex: 1,
+  },
+  verificationLabel: {
+    fontSize: Theme.typography.sizes.sm,
+    color: Theme.colors.textPrimary,
+    fontFamily: Theme.typography.fontFamilySemiBold,
+  },
+  verificationDate: {
+    fontSize: 11,
+    color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamily,
+    marginTop: 2,
+  },
+  reactivateBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    height: 'auto',
   },
 });

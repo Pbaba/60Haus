@@ -72,12 +72,47 @@ const FeedItemCellComponent: React.FC<FeedItemCellProps> = ({
           </Text>
 
           <View style={styles.metadataRow}>
-            {item.trustSignals && item.trustSignals.some((s) => s.toLowerCase().includes('verified')) && (
-              <>
-                <Text style={styles.metadataText}>✓ Verified</Text>
-                <Text style={styles.metadataSeparator}>•</Text>
-              </>
-            )}
+            {(() => {
+              // 1. Trust Signals fallback
+              const hasOldBadge = item.trustSignals && item.trustSignals.some((s) => s.toLowerCase().includes('verified'));
+              // 2. New Verification Lifecycle Logic
+              if (!item.lastVerifiedAt && !hasOldBadge) return null;
+              
+              let badgeText = '✓ Verified';
+              
+              if (item.lastVerifiedAt) {
+                const verifiedDate = new Date(item.lastVerifiedAt);
+                const now = new Date();
+                const diffMs = now.getTime() - verifiedDate.getTime();
+                const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                
+                if (diffDays === 0) badgeText = '✓ Verified Today';
+                else if (diffDays === 1) badgeText = '✓ Verified Yesterday';
+                else badgeText = `✓ Verified ${diffDays} Days Ago`;
+              }
+
+              // Sprint 20: Additional trust badges (limit to 1 extra)
+              let extraBadge = null;
+              if (item.videoUrl && item.videoUrl.length > 0) {
+                extraBadge = '✓ Walkthrough Available';
+              } else if (item.healthStatus === 'excellent') {
+                extraBadge = '✓ Premium Listing';
+              }
+
+              return (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <View style={styles.verifiedBadgeContainer}>
+                    <Text style={styles.verifiedBadgeText}>{badgeText}</Text>
+                  </View>
+                  {extraBadge && (
+                    <View style={styles.trustBadgeContainer}>
+                      <Text style={styles.trustBadgeText}>{extraBadge}</Text>
+                    </View>
+                  )}
+                  <Text style={styles.metadataSeparator}>•</Text>
+                </View>
+              );
+            })()}
             <Text style={styles.metadataText}>
               {(() => {
                 if (!item.createdAt) return 'Listed recently';
@@ -233,6 +268,32 @@ const styles = StyleSheet.create({
   metadataSeparator: {
     fontSize: Theme.typography.sizes.xs,
     color: Theme.colors.textMuted,
+  },
+  verifiedBadgeContainer: {
+    backgroundColor: 'rgba(34, 197, 94, 0.15)', // Light green tint
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Theme.borderRadius.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.3)',
+  },
+  verifiedBadgeText: {
+    fontSize: Theme.typography.sizes.xxs,
+    color: '#4ade80', // green-400
+    fontFamily: Theme.typography.fontFamilySemiBold,
+  },
+  trustBadgeContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Theme.borderRadius.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  trustBadgeText: {
+    fontSize: Theme.typography.sizes.xxs,
+    color: Theme.colors.textSecondary,
+    fontFamily: Theme.typography.fontFamilySemiBold,
   },
   title: {
     fontSize: Theme.typography.sizes.lg,

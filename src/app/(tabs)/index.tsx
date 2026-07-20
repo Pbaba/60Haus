@@ -23,6 +23,7 @@ import { useFeedback } from '../../context/FeedbackContext';
 import { profileService } from '../../services/profileService';
 import { ScreenContainer } from '../../components/ScreenContainer';
 import { Button } from '../../components/Button';
+import { ReportListingModal } from '../../components/ReportListingModal';
 import { DiscoveryEndScreen } from '../../components/DiscoveryEndScreen';
 import { FeedItemCell } from '../../components/FeedItemCell';
 import { AMENITIES } from '../../constants/property';
@@ -97,8 +98,13 @@ export default function FeedScreen() {
 
   // Collections modal states
   const [saveModalVisible, setSaveModalVisible] = useState(false);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [selectedColId, setSelectedColId] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
+  
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportingPropertyId, setReportingPropertyId] = useState<string | null>(null);
+
   const [creatingNewCollection, setCreatingNewCollection] = useState(false);
   const [newColName, setNewColName] = useState('');
   const [newColDesc, setNewColDesc] = useState('');
@@ -241,13 +247,6 @@ export default function FeedScreen() {
     }
   }, [selectedProperty, properties]);
 
-  // Listing Report States
-  const [reportingPropertyId, setReportingPropertyId] = useState<string | null>(null);
-  const [reportReason, setReportReason] = useState<string | null>(null);
-  const [reportDetails, setReportDetails] = useState('');
-  const [submittingReport, setSubmittingReport] = useState(false);
-
-
   // Save active progress in background when index changes
   useEffect(() => {
     if (filteredProperties.length > 0 && activeIdx < filteredProperties.length) {
@@ -302,6 +301,14 @@ export default function FeedScreen() {
             <Text style={styles.sinceLastLabel}>recently updated homes</Text>
           </View>
         </View>
+        <ReportListingModal 
+          visible={reportModalVisible}
+          propertyId={reportingPropertyId}
+          onClose={() => {
+            setReportModalVisible(false);
+            setReportingPropertyId(null);
+          }}
+        />
       </View>
     );
   };
@@ -334,27 +341,8 @@ export default function FeedScreen() {
       return;
     }
     setReportingPropertyId(id);
+    setReportModalVisible(true);
   }, [isGuest, router]);
-
-  const handleConfirmReport = async () => {
-    if (!reportingPropertyId || !reportReason) return;
-    setSubmittingReport(true);
-    try {
-      await reportService.submitReport(reportingPropertyId, reportReason, reportDetails);
-      showTransactionFeedback(
-        'success',
-        'Report Submitted',
-        'Thank you. Our moderation team will review this listing shortly.'
-      );
-      setReportingPropertyId(null);
-      setReportReason(null);
-      setReportDetails('');
-    } catch {
-      showTransactionFeedback('error', 'Report Failed', 'Failed to submit report. Please try again.');
-    } finally {
-      setSubmittingReport(false);
-    }
-  };
 
   const handleRefresh = () => {
     fetchFeed();
@@ -409,8 +397,12 @@ export default function FeedScreen() {
     }
   }, [activeIdx, filteredProperties]);
 
-  const renderItem = useCallback(({ item, index }: { item: PropertyListing; index: number }) => {
-    const isActive = index === activeIdx;
+  const handleToggleMute = useCallback(() => setIsMuted(prev => !prev), []);
+  const handleViewCountIncrement = useCallback((id: string) => incrementViewCount(id), [incrementViewCount]);
+
+  const renderItem = useCallback(({ item, index, extraData }: any) => {
+    const { activeIdx: currentActiveIdx, isMuted: currentIsMuted } = extraData || { activeIdx: 0, isMuted: false };
+    const isActive = index === currentActiveIdx;
 
     if ((item as any).isEndCard) {
       return (
@@ -438,31 +430,34 @@ export default function FeedScreen() {
         item={item}
         isActive={isActive}
         isSaved={isSaved}
-        isMuted={isMuted}
-        shouldLoad={isActive || index === activeIdx + 1}
-        onToggleMute={() => setIsMuted(prev => !prev)}
-        onViewCountIncrement={() => incrementViewCount(item.id)}
+        isMuted={currentIsMuted}
+        shouldLoad={isActive || index === currentActiveIdx + 1}
+        onToggleMute={handleToggleMute}
+        onViewCountIncrement={() => handleViewCountIncrement(item.id)}
         onSavePress={handleSavePress}
         onQuickCall={handleQuickCall}
         onReportPress={handleReportPress}
         onPropertyPress={handlePropertyPress}
       />
     );
-  }, [savedPropertyIds, activeIdx, isMuted, handleReportPress, handleSavePress, handleQuickCall, incrementViewCount, handlePropertyPress, router]);
+  }, [savedPropertyIds, handleReportPress, handleSavePress, handleQuickCall, handleViewCountIncrement, handlePropertyPress, router, handleToggleMute]);
 
-  const listData = [...filteredProperties];
-  if (listData.length >= 3 && !loading) {
-    listData.splice(2, 0, {
-      id: 'since-last-visit-card',
-      isSinceLastVisitCard: true,
-    } as any);
-  }
-  if (!hasExactMatchesRemaining && listData.length > 0 && !loading) {
-    listData.push({
-      id: 'discovery-end-card',
-      isEndCard: true,
-    } as any);
-  }
+  const listData = React.useMemo(() => {
+    const data = [...filteredProperties];
+    if (data.length >= 3 && !loading) {
+      data.splice(2, 0, {
+        id: 'since-last-visit-card',
+        isSinceLastVisitCard: true,
+      } as any);
+    }
+    if (!hasExactMatchesRemaining && data.length > 0 && !loading) {
+      data.push({
+        id: 'discovery-end-card',
+        isEndCard: true,
+      } as any);
+    }
+    return data;
+  }, [filteredProperties, loading, hasExactMatchesRemaining]);
 
   return (
     <ScreenContainer
@@ -476,6 +471,7 @@ export default function FeedScreen() {
         <FlashListAny
           ref={listRef}
           data={listData}
+          extraData={{ activeIdx, isMuted }}
           renderItem={renderItem}
           keyExtractor={(item: PropertyListing) => item.id}
           pagingEnabled
@@ -1067,71 +1063,6 @@ export default function FeedScreen() {
         </View>
       </Modal>
 
-      {/* Listing Report Bottom Sheet */}
-      <BottomSheet
-        isOpen={reportingPropertyId !== null}
-        onClose={() => {
-          setReportingPropertyId(null);
-          setReportReason(null);
-          setReportDetails('');
-        }}
-        title="Report Listing"
-      >
-        <View style={styles.reportSheet}>
-          <Text style={styles.reportSubtitle}>Select the reason for reporting this property:</Text>
-          
-          <ScrollView
-            style={styles.reasonScroll}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.reasonScrollContent}
-          >
-            {[
-              'Spam',
-              'Duplicate Listing',
-              'Incorrect Information',
-              'Misleading Photos',
-              'Scam',
-              'Already Sold/Rented',
-              'Other',
-            ].map((reason) => {
-              const isSelected = reportReason === reason;
-              return (
-                <TouchableOpacity
-                  key={reason}
-                  activeOpacity={0.8}
-                  style={[styles.reasonItem, isSelected && styles.reasonItemActive]}
-                  onPress={() => setReportReason(reason)}
-                >
-                  <Text style={[styles.reasonText, isSelected && styles.reasonTextActive]}>
-                    {reason}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-          {reportReason !== null && (
-            <View style={styles.reportForm}>
-              <Input
-                label="Optional Details"
-                placeholder="Provide details of the issue..."
-                value={reportDetails}
-                onChangeText={setReportDetails}
-                editable={!submittingReport}
-              />
-
-              <Button
-                variant="primary"
-                style={styles.submitReportBtn}
-                disabled={submittingReport}
-                onPress={handleConfirmReport}
-              >
-                {submittingReport ? 'Submitting...' : 'Submit Report'}
-              </Button>
-            </View>
-          )}
-        </View>
-      </BottomSheet>
     </ScreenContainer>
   );
 }

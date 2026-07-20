@@ -47,6 +47,20 @@ export interface PropertyListing {
   postalCode?: string;
   formattedAddress?: string;
 
+  // Verification Lifecycle
+  lastVerifiedAt?: string;
+  verificationDueAt?: string;
+  nextVerificationAt?: string;
+  verificationStatus?: 'active' | 'awaiting_verification' | 'grace_period' | 'inactive_unverified';
+  verificationMissCount?: number;
+
+  // Marketplace Integrity (Sprint 20)
+  healthScore?: number;
+  healthStatus?: 'excellent' | 'good' | 'needs_attention' | 'poor';
+  healthBreakdown?: Record<string, any>;
+  lastIntegrityCheckAt?: string;
+  dynamicTrustRank?: number; // Fetched from backend view
+
   // Sale specific columns
   carpetArea?: number;
   builtUpArea?: number;
@@ -77,7 +91,6 @@ export interface PropertyListing {
   priceTier?: 'budget' | 'mid-range' | 'premium' | 'luxury';
   areaTier?: 'compact' | 'medium' | 'spacious' | 'villa';
   luxuryClassification?: 'standard' | 'luxury' | 'ultra-luxury';
-  healthScore?: number;
   healthSuggestions?: { text: string; boost: number }[];
 }
 
@@ -107,6 +120,38 @@ export interface PropertyReport {
   reporterId: string;
   propertyId: string;
   reason: string;
+  details?: string;
+  status: 'pending' | 'under_review' | 'dismissed' | 'confirmed' | 'resolved';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DuplicateListingCandidate {
+  id: string;
+  propertyId: string;
+  duplicateOfId: string;
+  similarityScore: number;
+  confidenceLevel: 'high' | 'medium' | 'low';
+  status: 'pending' | 'under_review' | 'dismissed' | 'confirmed' | 'resolved';
+  createdAt: string;
+}
+
+export interface OwnerReliabilityMetrics {
+  ownerId: string;
+  reliabilityScore: number;
+  responseRate: number;
+  reportCount: number;
+  verificationMissCount: number;
+  updatedAt: string;
+}
+
+export interface ModerationEvent {
+  id: string;
+  entityType: 'property' | 'report' | 'duplicate';
+  entityId: string;
+  moderatorId?: string;
+  action: string;
+  notes?: string;
   createdAt: string;
 }
 
@@ -181,5 +226,15 @@ export interface ListingQualityReport {
     whyItMatters: string;
     score: number;
   }[];
+}
+
+export interface ListingVerificationHistory {
+  id: string;
+  propertyId: string;
+  ownerId: string;
+  actionTaken: 'verified_available' | 'marked_sold' | 'marked_rented' | 'paused' | 'auto_deactivated';
+  previousStatus: 'active' | 'awaiting_verification' | 'grace_period' | 'inactive_unverified';
+  newStatus: 'active' | 'awaiting_verification' | 'grace_period' | 'inactive_unverified' | 'archived';
+  createdAt: string;
 }
 

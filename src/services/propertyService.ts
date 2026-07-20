@@ -136,6 +136,15 @@ export const propertyService = {
       status: data.status,
       propertyType: data.property_type,
       locality: data.locality,
+      lastVerifiedAt: data.last_verified_at,
+      verificationDueAt: data.verification_due_at,
+      nextVerificationAt: data.next_verification_at,
+      verificationStatus: data.verification_status,
+      verificationMissCount: data.verification_miss_count,
+      healthScore: data.health_score,
+      healthStatus: data.health_status,
+      healthBreakdown: data.health_breakdown,
+      lastIntegrityCheckAt: data.last_integrity_check_at,
     };
   },
 
@@ -370,6 +379,15 @@ export const propertyService = {
       state: propData.state || undefined,
       postalCode: propData.postal_code || undefined,
       formattedAddress: propData.formatted_address || undefined,
+      lastVerifiedAt: propData.last_verified_at,
+      verificationDueAt: propData.verification_due_at,
+      nextVerificationAt: propData.next_verification_at,
+      verificationStatus: propData.verification_status,
+      verificationMissCount: propData.verification_miss_count,
+      healthScore: propData.health_score,
+      healthStatus: propData.health_status,
+      healthBreakdown: propData.health_breakdown,
+      lastIntegrityCheckAt: propData.last_integrity_check_at,
     });
   },
 
@@ -427,6 +445,15 @@ export const propertyService = {
         state: item.state || undefined,
         postalCode: item.postal_code || undefined,
         formattedAddress: item.formatted_address || undefined,
+        lastVerifiedAt: item.last_verified_at,
+        verificationDueAt: item.verification_due_at,
+        nextVerificationAt: item.next_verification_at,
+        verificationStatus: item.verification_status,
+        verificationMissCount: item.verification_miss_count,
+        healthScore: item.health_score,
+        healthStatus: item.health_status,
+        healthBreakdown: item.health_breakdown,
+        lastIntegrityCheckAt: item.last_integrity_check_at,
       });
     });
   },
@@ -492,5 +519,68 @@ export const propertyService = {
     } catch (e) {
       console.warn('Failed to increment contact count:', e);
     }
+  },
+
+  async getPendingVerifications(ownerId: string): Promise<PropertyListing[]> {
+    const listings = await this.getOwnerListings(ownerId);
+    return listings.filter(l => 
+      l.verificationStatus === 'awaiting_verification' || 
+      l.verificationStatus === 'grace_period'
+    );
+  },
+
+  async submitVerification(
+    listingId: string, 
+    ownerId: string,
+    action: 'verified_available' | 'marked_sold' | 'marked_rented' | 'paused',
+    currentNextVerificationAt: string
+  ): Promise<void> {
+    const nextDate = new Date(currentNextVerificationAt);
+    nextDate.setDate(nextDate.getDate() + 7); // Increment scheduled cadence by 7 days
+
+    let newStatus = 'active';
+    let newListingStatus = undefined;
+
+    switch (action) {
+      case 'verified_available':
+        newStatus = 'active';
+        break;
+      case 'marked_sold':
+      case 'marked_rented':
+        newStatus = 'active';
+        newListingStatus = action === 'marked_sold' ? 'sold' : 'rented';
+        break;
+      case 'paused':
+        newStatus = 'inactive_unverified';
+        newListingStatus = 'archived';
+        break;
+    }
+
+    const updatePayload: any = {
+      verification_status: newStatus,
+      last_verified_at: new Date().toISOString(),
+      next_verification_at: nextDate.toISOString(),
+    };
+
+    if (newListingStatus) {
+      updatePayload.status = newListingStatus;
+    }
+
+    const { error } = await supabase
+      .from('properties')
+      .update(updatePayload)
+      .eq('id', listingId)
+      .eq('owner_id', ownerId);
+
+    if (error) throw error;
+
+    // Log the history
+    await supabase.from('listing_verification_history').insert({
+      property_id: listingId,
+      owner_id: ownerId,
+      action_taken: action,
+      previous_status: 'awaiting_verification', // Or grace_period, assuming backend logic could be smarter here but we log action
+      new_status: newStatus
+    });
   },
 };

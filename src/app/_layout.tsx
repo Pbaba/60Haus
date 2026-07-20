@@ -13,6 +13,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { Theme } from '../theme';
 
 import { FeedbackProvider } from '../context/FeedbackContext';
+import { ListingVerificationModal } from '../components/ListingVerificationModal';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -143,6 +144,7 @@ export default function RootLayout() {
                       options={{ presentation: 'card' }}
                     />
                   </Stack>
+                  <ListingVerificationModal />
                 </PropertyProvider>
               </ProfileProvider>
             </AuthProvider>
