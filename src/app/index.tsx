@@ -21,21 +21,17 @@ export default function SplashScreen() {
   useEffect(() => {
     if (loading) return; // Keep rendering splash until initial session check finishes
 
-    const timer = setTimeout(() => {
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true,
-      }).start(() => {
-        if (user) {
-          router.replace('/(tabs)' as any);
-        } else {
-          router.replace('/onboarding' as any);
-        }
-      });
-    }, 1200);
-
-    return () => clearTimeout(timer);
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 400,
+      useNativeDriver: true,
+    }).start(() => {
+      if (user) {
+        router.replace('/(tabs)' as any);
+      } else {
+        router.replace('/onboarding' as any);
+      }
+    });
   }, [loading, user, fadeAnim, router]);
 
   return (

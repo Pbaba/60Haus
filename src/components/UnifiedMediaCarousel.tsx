@@ -30,16 +30,7 @@ interface MediaSlide {
   thumbnailUrl?: string;
 }
 
-const VideoSlide: React.FC<{
-  videoUrl: string;
-  thumbnailUrl?: string;
-  isActive: boolean;
-  isCarouselActive: boolean;
-  isMuted: boolean;
-  onToggleMute: () => void;
-  onViewCountIncrement: () => void;
-  shouldLoad: boolean;
-}> = ({
+const ActiveVideoSlide = React.memo(({
   videoUrl,
   thumbnailUrl,
   isActive,
@@ -47,8 +38,7 @@ const VideoSlide: React.FC<{
   isMuted,
   onToggleMute,
   onViewCountIncrement,
-  shouldLoad,
-}) => {
+}: any) => {
   const [isReady, setIsReady] = useState(false);
   const [hasError, setHasError] = useState(false);
 
@@ -63,14 +53,19 @@ const VideoSlide: React.FC<{
     player.muted = isMuted;
   }, [isMuted, player]);
 
+  const incrementRef = useRef(onViewCountIncrement);
+  useEffect(() => {
+    incrementRef.current = onViewCountIncrement;
+  }, [onViewCountIncrement]);
+
   useEffect(() => {
     let timer: any;
-    if (shouldPlay && shouldLoad) {
+    if (shouldPlay) {
       setHasError(false);
       player.play();
 
       timer = setTimeout(() => {
-        onViewCountIncrement();
+        incrementRef.current();
       }, 2000);
     } else {
       player.pause();
@@ -78,7 +73,7 @@ const VideoSlide: React.FC<{
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [shouldPlay, shouldLoad, player, onViewCountIncrement]);
+  }, [shouldPlay, player]);
 
   useEffect(() => {
     const playSub = player.addListener('playingChange', (isPlaying) => {
@@ -107,26 +102,24 @@ const VideoSlide: React.FC<{
 
   return (
     <View style={styles.slideWrapper}>
-      {shouldLoad && (
-        <VideoView
-          player={player}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          nativeControls={false}
-        />
-      )}
+      <VideoView
+        player={player}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        nativeControls={false}
+      />
 
-      {(!isReady || hasError || !shouldLoad) && thumbnailUrl && (
+      {(!isReady || hasError) && thumbnailUrl && (
         <Image source={{ uri: thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
       )}
 
-      {shouldLoad && !isReady && !hasError && (
+      {!isReady && !hasError && (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color={Theme.colors.primary} />
         </View>
       )}
 
-      {shouldLoad && hasError && (
+      {hasError && (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Failed to load video</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={handleRetry}>
@@ -141,9 +134,42 @@ const VideoSlide: React.FC<{
       </TouchableOpacity>
     </View>
   );
-};
+});
 
-export const UnifiedMediaCarousel: React.FC<UnifiedMediaCarouselProps> = ({
+const VideoSlide = React.memo(({
+  videoUrl,
+  thumbnailUrl,
+  isActive,
+  isCarouselActive,
+  isMuted,
+  onToggleMute,
+  onViewCountIncrement,
+  shouldLoad,
+}: any) => {
+  if (shouldLoad) {
+    return (
+      <ActiveVideoSlide
+        videoUrl={videoUrl}
+        thumbnailUrl={thumbnailUrl}
+        isActive={isActive}
+        isCarouselActive={isCarouselActive}
+        isMuted={isMuted}
+        onToggleMute={onToggleMute}
+        onViewCountIncrement={onViewCountIncrement}
+      />
+    );
+  }
+
+  return (
+    <View style={styles.slideWrapper}>
+      {thumbnailUrl && (
+        <Image source={{ uri: thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+      )}
+    </View>
+  );
+});
+
+export const UnifiedMediaCarousel: React.FC<UnifiedMediaCarouselProps> = React.memo(({
   item,
   isActive,
   isMuted,
@@ -179,7 +205,7 @@ export const UnifiedMediaCarousel: React.FC<UnifiedMediaCarouselProps> = ({
   const heartScale = useSharedValue(0);
   const heartOpacity = useSharedValue(0);
 
-  const triggerHeartAnimation = () => {
+  const triggerHeartAnimation = React.useCallback(() => {
     setShowHeart(true);
     heartScale.value = 0;
     heartOpacity.value = 0;
@@ -192,9 +218,9 @@ export const UnifiedMediaCarousel: React.FC<UnifiedMediaCarouselProps> = ({
         runOnJS(setShowHeart)(false);
       }));
     });
-  };
+  }, [heartScale, heartOpacity]);
 
-  const handlePress = () => {
+  const handlePress = React.useCallback(() => {
     const now = Date.now();
     if (now - lastTap.current < 320) {
       hapticsService.light();
@@ -202,19 +228,55 @@ export const UnifiedMediaCarousel: React.FC<UnifiedMediaCarouselProps> = ({
       onDoubleTapSave?.();
     }
     lastTap.current = now;
-  };
+  }, [triggerHeartAnimation, onDoubleTapSave]);
 
   const heartStyle = useAnimatedStyle(() => ({
     opacity: heartOpacity.value,
     transform: [{ scale: heartScale.value }],
   }));
 
-  const handleScroll = (event: any) => {
+  const handleScroll = React.useCallback((event: any) => {
     const index = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
     if (index !== currentSlideIndex) {
       setCurrentSlideIndex(index);
     }
-  };
+  }, [currentSlideIndex]);
+
+  const renderItem = React.useCallback(({ item: slide, index, extraData: activeSlideIndex }: any) => {
+    if (slide.type === 'video') {
+      return (
+        <Pressable style={styles.slideWrapper} onPress={handlePress}>
+          <VideoSlide
+            videoUrl={slide.url}
+            thumbnailUrl={slide.thumbnailUrl}
+            isActive={isActive}
+            isCarouselActive={index === activeSlideIndex}
+            isMuted={isMuted}
+            onToggleMute={onToggleMute}
+            onViewCountIncrement={onViewCountIncrement}
+            shouldLoad={shouldLoad}
+          />
+        </Pressable>
+      );
+    } else {
+      return (
+        <Pressable style={styles.slideWrapper} onPress={handlePress}>
+          <Image
+            source={{ uri: slide.url }}
+            style={styles.backgroundImage}
+            contentFit="cover"
+            blurRadius={32}
+          />
+          <View style={styles.darkOverlay} />
+          <Image
+            source={{ uri: slide.url }}
+            style={styles.foregroundImage}
+            contentFit="contain"
+          />
+        </Pressable>
+      );
+    }
+  }, [handlePress, isActive, isMuted, onToggleMute, onViewCountIncrement, shouldLoad]);
 
   return (
     <View style={styles.container}>
@@ -225,45 +287,12 @@ export const UnifiedMediaCarousel: React.FC<UnifiedMediaCarouselProps> = ({
         scrollEnabled={true}
         nestedScrollEnabled={true}
         directionalLockEnabled={true}
+        extraData={currentSlideIndex}
         showsHorizontalScrollIndicator={false}
         keyExtractor={(slide, index) => `${slide.type}-${index}`}
         onMomentumScrollEnd={handleScroll}
         scrollEventThrottle={16}
-        renderItem={({ item: slide, index }) => {
-          if (slide.type === 'video') {
-            return (
-              <Pressable style={styles.slideWrapper} onPress={handlePress}>
-                <VideoSlide
-                  videoUrl={slide.url}
-                  thumbnailUrl={slide.thumbnailUrl}
-                  isActive={isActive}
-                  isCarouselActive={index === currentSlideIndex}
-                  isMuted={isMuted}
-                  onToggleMute={onToggleMute}
-                  onViewCountIncrement={onViewCountIncrement}
-                  shouldLoad={shouldLoad}
-                />
-              </Pressable>
-            );
-          } else {
-            return (
-              <Pressable style={styles.slideWrapper} onPress={handlePress}>
-                <Image
-                  source={{ uri: slide.url }}
-                  style={styles.backgroundImage}
-                  contentFit="cover"
-                  blurRadius={32}
-                />
-                <View style={styles.darkOverlay} />
-                <Image
-                  source={{ uri: slide.url }}
-                  style={styles.foregroundImage}
-                  contentFit="contain"
-                />
-              </Pressable>
-            );
-          }
-        }}
+        renderItem={renderItem}
         style={StyleSheet.absoluteFill}
       />
 
@@ -288,7 +317,11 @@ export const UnifiedMediaCarousel: React.FC<UnifiedMediaCarouselProps> = ({
       )}
     </View>
   );
-};
+});
+
+ActiveVideoSlide.displayName = 'ActiveVideoSlide';
+VideoSlide.displayName = 'VideoSlide';
+UnifiedMediaCarousel.displayName = 'UnifiedMediaCarousel';
 
 const styles = StyleSheet.create({
   container: {

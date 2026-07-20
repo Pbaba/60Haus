@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { StyleSheet, Text, View, Dimensions, ActivityIndicator } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -30,6 +30,16 @@ export const DiscoveryEndScreen: React.FC<DiscoveryEndScreenProps> = ({
   const { filters, setFilters, setDiscoveryMode, setFlexibleLevel } = useProperties();
   const [transitioning, setTransitioning] = useState(false);
   const [transitionMessage, setTransitionMessage] = useState('');
+
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const transitionIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+      if (transitionIntervalRef.current) clearInterval(transitionIntervalRef.current);
+    };
+  }, []);
 
   // Reanimated values for staggered spring entry and subtle fade
   const titleOpacity = useSharedValue(0);
@@ -95,15 +105,15 @@ export const DiscoveryEndScreen: React.FC<DiscoveryEndScreenProps> = ({
     setTransitionMessage(messages[0]);
     
     let msgIdx = 1;
-    const interval = setInterval(() => {
+    transitionIntervalRef.current = setInterval(() => {
       if (msgIdx < messages.length) {
         setTransitionMessage(messages[msgIdx]);
         msgIdx++;
       }
     }, 200);
 
-    setTimeout(() => {
-      clearInterval(interval);
+    transitionTimerRef.current = setTimeout(() => {
+      if (transitionIntervalRef.current) clearInterval(transitionIntervalRef.current);
       action();
       setTransitioning(false);
     }, 650);

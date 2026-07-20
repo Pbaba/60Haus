@@ -226,10 +226,11 @@ export function calculateListingHealth(item: PropertyListing): {
     });
   }
 
-  const score = Math.round(scoreFraction * 100);
+  const computedScore = Math.round(scoreFraction * 100);
+  const finalScore = item.healthScore !== undefined ? item.healthScore : Math.min(100, Math.max(0, computedScore));
 
   return {
-    score: Math.min(100, Math.max(0, score)),
+    score: finalScore,
     suggestions,
   };
 }
@@ -246,7 +247,8 @@ export function enrichPropertyListing(item: PropertyListing): PropertyListing {
     ...item,
     ...intel,
     trustSignals,
-    healthScore: health.score,
+    // Prefer backend computed health fields, fallback to local compute
+    healthScore: item.healthScore !== undefined ? item.healthScore : health.score,
     healthSuggestions: health.suggestions,
   };
 }
