@@ -53,5 +53,29 @@ export const notificationService = {
     }
 
     return token?.data;
+  },
+
+  async sendPushNotification(expoPushToken: string, title: string, body: string, data?: Record<string, any>) {
+    const message = {
+      to: expoPushToken,
+      sound: 'default',
+      title,
+      body,
+      data,
+    };
+
+    try {
+      await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Accept-encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message),
+      });
+    } catch (e) {
+      console.warn('Failed to send push notification', e);
+    }
   }
 };

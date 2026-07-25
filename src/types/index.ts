@@ -11,6 +11,7 @@ export interface UserProfile {
   preferredListingType?: 'rent' | 'buy';
   preferredBudget?: number;
   verificationLevel?: 'unverified' | 'basic' | 'verified' | 'premium';
+  push_token?: string;
 }
 
 export interface PropertyListing {
@@ -238,3 +239,71 @@ export interface ListingVerificationHistory {
   createdAt: string;
 }
 
+// --- Sprint 24: Communication & Lead Management ---
+
+export type LeadStatus = 'new_inquiry' | 'responded' | 'visit_scheduled' | 'negotiating' | 'closed' | 'archived';
+export type MessageType = 'text' | 'system' | 'visit_request' | 'attachment';
+export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+export type VisitStatus = 'pending' | 'accepted' | 'declined' | 'rescheduled' | 'cancelled';
+
+export interface Conversation {
+  id: string;
+  property_id: string;
+  owner_id: string;
+  buyer_id: string;
+  lead_status: LeadStatus;
+  created_at: string;
+  updated_at: string;
+  last_message_preview?: string;
+  property?: PropertyListing; // Joined
+  owner?: UserProfile; // Joined
+  buyer?: UserProfile; // Joined
+  unread_count?: number; // Computed locally
+}
+
+export interface ConversationParticipant {
+  conversation_id: string;
+  user_id: string;
+  last_read_at: string;
+  is_archived: boolean;
+}
+
+export interface MessageAttachment {
+  id: string;
+  message_id: string;
+  type: 'image' | 'property_card';
+  url: string;
+  metadata?: Record<string, any>;
+  created_at: string;
+}
+
+export interface Message {
+  id: string;
+  conversation_id: string;
+  sender_id: string | null; // null for system messages
+  text: string;
+  type: MessageType;
+  status: MessageStatus;
+  created_at: string;
+  attachments?: MessageAttachment[]; // Joined
+}
+
+export interface VisitRequest {
+  id: string;
+  conversation_id: string;
+  buyer_id: string;
+  requested_date: string;
+  requested_time: string;
+  note?: string;
+  status: VisitStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SavedReply {
+  id: string;
+  owner_id: string;
+  text: string;
+  sort_order: number;
+  created_at: string;
+}

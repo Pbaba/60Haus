@@ -19,6 +19,8 @@ export default function TabsLayout() {
     activeTab = 'profile';
   } else if (pathname.includes('/owner/dashboard')) {
     activeTab = 'owner-dashboard';
+  } else if (pathname.includes('/inbox')) {
+    activeTab = 'inbox';
   }
 
   const handleTabPress = (key: string) => {
@@ -40,6 +42,7 @@ export default function TabsLayout() {
         <Tabs.Screen name="index" />
         <Tabs.Screen name="discover" />
         <Tabs.Screen name="saved" />
+        <Tabs.Screen name="inbox" />
         <Tabs.Screen name="profile" />
       </Tabs>
 
