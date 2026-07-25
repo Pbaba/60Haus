@@ -17,7 +17,10 @@ import { useProperties } from '../../hooks/useProperties';
 import { propertyService } from '../../services/propertyService';
 import { Theme } from '../../theme';
 import { formatCurrency } from '../../utils';
-import { ArrowLeft, PlusCircle, Eye, Heart, Phone, Trash2 } from 'lucide-react-native';
+import { SkeletonDashboard } from '../../components/Skeleton';
+import { EmptyState } from '../../components/EmptyState';
+import { useHaptics } from '../../hooks/useHaptics';
+import { ArrowLeft, PlusCircle, Eye, Heart, Phone, Trash2, Video } from 'lucide-react-native';
 import { PropertyListing } from '../../types';
 import { localityIntelligence } from '../../domain/location/localityIntelligence';
 import { marketInsights } from '../../domain/location/marketInsights';
@@ -57,6 +60,7 @@ export default function OwnerDashboardScreen() {
   const [confirmArchiveId, setConfirmArchiveId] = useState<string | null>(null);
   const [confirmRestoreId, setConfirmRestoreId] = useState<string | null>(null);
   const [dialogLoading, setDialogLoading] = useState(false);
+  const haptics = useHaptics();
 
   const fetchDashboardStats = useCallback(async () => {
     if (!profile?.id) return;
@@ -307,6 +311,7 @@ export default function OwnerDashboardScreen() {
                   setDialogLoading(true);
                   try {
                     await propertyService.submitVerification(item.id, profile!.id, 'verified_available', item.nextVerificationAt || new Date().toISOString());
+                    haptics.success();
                     await fetchDashboardStats();
                   } catch (e: any) {
                     alert('Failed to reactivate: ' + e.message);
@@ -371,9 +376,20 @@ export default function OwnerDashboardScreen() {
 
   if (loading) {
     return (
-      <ScreenContainer style={styles.center}>
-        <ActivityIndicator size="large" color={Theme.colors.primary} />
-        <Text style={styles.loadingText}>Fetching analytics metrics...</Text>
+      <ScreenContainer style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.replace('/(tabs)/profile' as any)}>
+            <ArrowLeft size={24} color={Theme.colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.title}>Host Dashboard</Text>
+          <TouchableOpacity
+            style={styles.addBtn}
+            onPress={() => router.push('/owner/upload' as any)}
+          >
+            <PlusCircle size={24} color={Theme.colors.primary} />
+          </TouchableOpacity>
+        </View>
+        <SkeletonDashboard />
       </ScreenContainer>
     );
   }
@@ -478,12 +494,12 @@ export default function OwnerDashboardScreen() {
           </View>
         ) : (
           <View style={styles.emptyContainer}>
-            <FeedbackState
-              type="empty-listings"
+            <EmptyState
+              icon={Video}
               title="Publish your first property."
-              subtitle="List walkthrough videos and get direct leads today."
-              onRetry={() => router.push('/owner/upload' as any)}
-              actionText="Create Listing"
+              description="List walkthrough videos and get direct leads today."
+              onAction={() => router.push('/owner/upload' as any)}
+              actionLabel="Create Listing"
             />
           </View>
         )}

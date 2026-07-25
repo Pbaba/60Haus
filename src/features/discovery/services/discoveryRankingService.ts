@@ -1,8 +1,9 @@
-import { PropertyListing } from '../types';
-import { DISCOVERY_WEIGHTS } from '../constants/property';
-import { enrichPropertyListing } from '../utils/propertyIntelligence';
+import { PropertyListing } from '../../../types';
+import { DISCOVERY_WEIGHTS } from '../../../constants/property';
+import { enrichPropertyListing } from '../../../utils/propertyIntelligence';
+import { supabase } from '../../../lib/supabase';
 
-export const personalizationService = {
+export const discoveryRankingService = {
   // Score a listing based on user profile preferences, saves, and recent history
   computeListingScore(
     item: PropertyListing,
@@ -76,25 +77,22 @@ export const personalizationService = {
       
       if (item.bedrooms === favoriteBhk) {
         score += 1.0;
-        explanations.push(`Matches your typical BHK search (${item.bedrooms} BHK)`);
+        explanations.push(`Matches your typical search (${item.bedrooms} BHK)`);
       }
     }
 
-    // 3. Saved property similarity
-    if (savedProperties.length > 0) {
-      const similarSaved = savedProperties.some(
-        (p) =>
-          p.city.toLowerCase() === item.city.toLowerCase() &&
-          p.bedrooms === item.bedrooms &&
-          p.listingType === item.listingType
-      );
-      if (similarSaved) {
-        score += 2.0;
-        explanations.push('Similar to saved homes');
-      }
+    // 4. Trust & Quality Signals (Sprint 20 & 23 expansions)
+    if (item.healthStatus === 'excellent') {
+      score += 1.5;
+      trustSignals.push('Excellent Quality');
+    }
+    
+    if (item.dynamicTrustRank && item.dynamicTrustRank > 80) {
+      score += 2.0;
+      trustSignals.push('Highly Trusted');
     }
 
-    // 4. Viewing history influence
+    // 5. Viewing history influence
     if (recentlyViewedProperties.length > 0) {
       const similarViewed = recentlyViewedProperties.some(
         (p) =>
@@ -108,38 +106,6 @@ export const personalizationService = {
       }
     }
 
-    // 5. Listing freshness
-    const now = Date.now();
-    const ageInMs = now - new Date(item.createdAt).getTime();
-    const ageInDays = ageInMs / (1000 * 60 * 60 * 24);
-    
-    if (ageInDays <= 1) {
-      score += 2.0;
-      explanations.push('Recently listed');
-      trustSignals.push('Listed Today');
-    } else if (ageInDays <= 3) {
-      score += 1.0;
-      trustSignals.push('Recently Updated');
-    }
-
-    // 6. Popularity
-    const popularity = (item.viewCount || 0) + (item.saveCount || 0) * 4;
-    if (popularity > 25) {
-      score += 1.5;
-      explanations.push('Popular among buyers');
-      trustSignals.push('Popular Listing');
-    }
-
-    // 7. Trust signals (Owner verification, video tour)
-    const isOwnerVerified = (item.ownerId.charCodeAt(0) + item.ownerId.charCodeAt(item.ownerId.length - 1)) % 2 === 0;
-    if (isOwnerVerified) {
-      trustSignals.push('Verified Owner');
-    }
-
-    if (item.videoUrl && item.videoUrl.length > 0) {
-      trustSignals.push('High Quality Walkthrough');
-    }
-
     // Fallbacks and limits
     if (explanations.length === 0) {
       explanations.push('Matches active search');
@@ -147,8 +113,8 @@ export const personalizationService = {
 
     return {
       score,
-      explanations: explanations.slice(0, 3), // Limit explanations to three chips
-      trustSignals: trustSignals.slice(0, 3),   // Limit trust badges to three
+      explanations: explanations.slice(0, 3),
+      trustSignals: trustSignals.slice(0, 3),
     };
   },
 
@@ -159,7 +125,6 @@ export const personalizationService = {
     savedProperties: PropertyListing[] = [],
     recentlyViewedProperties: PropertyListing[] = []
   ): PropertyListing[] {
-    // Precompute locality counts once
     const localityCounts: Record<string, number> = {};
     recentlyViewedProperties.forEach((p) => {
       if (p.locality) {
@@ -175,10 +140,9 @@ export const personalizationService = {
     });
 
     const scoredListings = candidateListings.map((rawItem) => {
-      // Safely ensure item has computed intelligence, trust, and health metrics
       const item = rawItem.healthScore === undefined ? enrichPropertyListing(rawItem) : rawItem;
 
-      const { score, explanations } = this.computeListingScore(
+      const { score, explanations, trustSignals } = this.computeListingScore(
         item,
         userProfile,
         savedProperties,
@@ -186,10 +150,9 @@ export const personalizationService = {
         localityCounts
       );
 
-      // Compute composite ranking components normalized to 0.0 - 1.0
       const normPersonalization = Math.min(1.0, score / 10.0);
       const normHealth = (item.healthScore || 0) / 100.0;
-      const normTrust = (item.trustSignals?.length || 0) / 7.0; // 7 possible trust badges
+      const normTrust = (item.dynamicTrustRank || 0) / 100.0;
       
       const ageInDays = Math.max(0, (Date.now() - new Date(item.createdAt).getTime()) / (1000 * 60 * 60 * 24));
       const freshness = 1.0 / (1.0 + ageInDays);
@@ -204,12 +167,74 @@ export const personalizationService = {
       return {
         ...item,
         personalizationExplanations: explanations,
+        trustSignals: [...(item.trustSignals || []), ...trustSignals],
         personalizationScore: score,
-        priority_score: compositeScore, // Assign composite discovery ranking score
+        priority_score: compositeScore,
       };
     });
 
-    // Sort by final calculated composite ranking score (descending)
     return (scoredListings as any[]).sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0));
+  },
+
+  // Get similar properties (replacing recommendations in discoveryService)
+  async getSimilarProperties(property: PropertyListing, limit: number = 5): Promise<PropertyListing[]> {
+    try {
+      // We leverage the ranked_feed_listings view from Sprint 20 that includes dynamic_trust_rank
+      const { data, error } = await supabase
+        .from('ranked_feed_listings')
+        .select('*, property_images(image_url), property_videos(video_url, thumbnail_url)')
+        .neq('id', property.id)
+        .limit(40); // Fetch a broad candidate pool
+
+      if (error) throw error;
+      if (!data) return [];
+
+      const mappedCandidates: PropertyListing[] = data.map((item: any) => {
+        const videoRecord = item.property_videos && item.property_videos[0];
+        return enrichPropertyListing({
+          ...item,
+          imageUrls: item.property_images ? item.property_images.map((img: any) => img.image_url) : [],
+          videoUrl: videoRecord?.video_url || '',
+          thumbnailUrl: videoRecord?.thumbnail_url || item.thumbnail_url,
+          dynamicTrustRank: item.dynamic_trust_rank,
+        });
+      });
+
+      const scored = mappedCandidates.map((candidate) => {
+        let matchScore = 0;
+        
+        // Location matching
+        if (candidate.city.toLowerCase() === property.city.toLowerCase()) matchScore += 5;
+        if (candidate.locality && property.locality && 
+            candidate.locality.toLowerCase() === property.locality.toLowerCase()) {
+          matchScore += 4;
+        }
+        
+        // Specs matching
+        if (candidate.bedrooms === property.bedrooms) matchScore += 3;
+        if (candidate.listingType === property.listingType) matchScore += 2;
+        if (candidate.propertyType === property.propertyType) matchScore += 2;
+
+        // Trust & Reliability Signals (Sprint 23 requirement)
+        if (candidate.dynamicTrustRank && candidate.dynamicTrustRank >= 80) matchScore += 3; // Highly trusted owner
+        if (candidate.healthStatus === 'excellent') matchScore += 2; // Great listing health
+        
+        // Verification Freshness
+        if (candidate.lastVerifiedAt) {
+           const daysSinceVerify = (Date.now() - new Date(candidate.lastVerifiedAt).getTime()) / (1000 * 60 * 60 * 24);
+           if (daysSinceVerify < 7) matchScore += 2; // Recently verified
+        }
+
+        return { candidate, matchScore };
+      });
+
+      return scored
+        .sort((a, b) => b.matchScore - a.matchScore)
+        .slice(0, limit)
+        .map((x) => x.candidate);
+    } catch (e) {
+      console.warn('Recommendations query failed:', e);
+      return [];
+    }
   },
 };

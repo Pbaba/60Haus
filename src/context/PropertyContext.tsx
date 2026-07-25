@@ -2,7 +2,7 @@ import React, { createContext, useState, useEffect, useCallback, useMemo, useRef
 import { hapticsService } from '../services/hapticsService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PropertyListing, DiscoveryMode, Collection } from '../types';
-import { SearchFilters } from '../components/SearchOverlay';
+import { SearchFilters } from '../features/discovery/components/FilterSheet';
 import { propertyService } from '../services/propertyService';
 import { discoveryService } from '../services/discoveryService';
 import { propertyUploadService, VideoAsset } from '../services/propertyUploadService';

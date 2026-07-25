@@ -34,6 +34,7 @@ import { historyService } from '../../services/historyService';
 import { SavedSearch, PropertyListing } from '../../types';
 import { useFeedback } from '../../context/FeedbackContext';
 import { analyticsService } from '../../services/analyticsService';
+import { CollectionCard } from '../../features/discovery/components/CollectionCard';
 
 export default function SavedScreen() {
   const router = useRouter();
@@ -254,34 +255,14 @@ export default function SavedScreen() {
         <FlatList
           data={collections}
           keyExtractor={(item) => item.id}
-          scrollEnabled={false} // Managed by outer ScrollView
+          scrollEnabled={false}
+          numColumns={2}
+          columnWrapperStyle={{ justifyContent: 'space-between' }}
           renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.collectionCard}
-              onPress={() => router.push(`/collection/${item.id}` as any)}
-              accessibilityLabel={`Open collection ${item.name}`}
-              accessibilityRole="button"
-            >
-              {item.coverImageUrl ? (
-                <Image source={{ uri: item.coverImageUrl }} style={styles.colCover} contentFit="cover" />
-              ) : (
-                <View style={styles.colCoverPlaceholder}>
-                  <BookOpen size={24} color={Theme.colors.border} />
-                </View>
-              )}
-              <View style={styles.colDetails}>
-                <Text style={styles.colName}>{item.name}</Text>
-                {item.description ? (
-                  <Text style={styles.colDesc} numberOfLines={1}>
-                    {item.description}
-                  </Text>
-                ) : null}
-                <Text style={styles.colCount}>
-                  {item.propertiesCount || 0} listings saved
-                </Text>
-              </View>
-              <ChevronRight size={18} color={Theme.colors.border} />
-            </TouchableOpacity>
+            <CollectionCard 
+              collection={item as any} 
+              onPress={(col) => router.push(`/collection/${col.id}` as any)} 
+            />
           )}
         />
       </View>

@@ -9,7 +9,7 @@ import { Theme } from '../../theme';
 import { useProperties } from '../../hooks/useProperties';
 import { useProfile } from '../../hooks/useProfile';
 import { useAuth } from '../../hooks/useAuth';
-import { ArrowLeft, Image as ImageIcon, Video, X, CheckCircle } from 'lucide-react-native';
+import { ArrowLeft, Image as ImageIcon, Video, X, CheckCircle, Camera } from 'lucide-react-native';
 import { Image } from 'expo-image';
 import { VideoAsset } from '../../services/propertyUploadService';
 import { useFeedback } from '../../context/FeedbackContext';
@@ -18,6 +18,9 @@ import { AMENITIES, AMENITY_CATEGORIES } from '../../constants/property';
 import { DraftManager } from '../../media/DraftManager';
 import { MediaValidator } from '../../media/MediaValidator';
 import { SegmentedSelector, TagCarousel } from '../../components/SelectionComponents';
+import { usePermissions } from '../../features/permissions/hooks/usePermissions';
+import { PermissionModal } from '../../features/permissions/components/PermissionModal';
+import { PermissionType } from '../../features/permissions/types';
 
 export default function OwnerUploadScreen() {
   const router = useRouter();
@@ -32,6 +35,22 @@ export default function OwnerUploadScreen() {
   const { profile, upgradeToOwner, updateProfile } = useProfile();
   const { isGuest } = useAuth();
   const { showToast } = useFeedback();
+  const { permissions, requestPermission, openSettings } = usePermissions();
+  
+  // Permission Modal State
+  const [permissionModal, setPermissionModal] = useState<{
+    visible: boolean;
+    type: PermissionType;
+    title: string;
+    description: string;
+    onContinue: () => void;
+  }>({
+    visible: false,
+    type: 'media',
+    title: '',
+    description: '',
+    onContinue: () => {},
+  });
   
   // Route Protection Check
   useEffect(() => {
@@ -327,14 +346,7 @@ export default function OwnerUploadScreen() {
     }
   }, [id, properties, profile]);
 
-  const handlePickImages = async () => {
-    if (publishing) return;
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (permissionResult.granted === false) {
-      Alert.alert('Permission Denied', 'Permission to access photo library is required.');
-      return;
-    }
-
+  const processImagePicker = async () => {
     const pickerResult = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsMultipleSelection: true,
@@ -348,14 +360,75 @@ export default function OwnerUploadScreen() {
     }
   };
 
-  const handlePickVideo = async () => {
+  const handlePickImages = async () => {
     if (publishing) return;
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (permissionResult.granted === false) {
-      Alert.alert('Permission Denied', 'Permission to access media library is required.');
-      return;
+    
+    if (permissions.media === 'granted' || permissions.media === 'limited') {
+      await processImagePicker();
+    } else if (permissions.media === 'denied') {
+      Alert.alert('Permission Denied', 'Please enable photo library access in settings to upload photos.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open Settings', onPress: openSettings }
+      ]);
+    } else {
+      setPermissionModal({
+        visible: true,
+        type: 'media',
+        title: 'Access Photo Library',
+        description: 'Upload high-quality photos of your property directly from your device to make your listing stand out.',
+        onContinue: async () => {
+          setPermissionModal(prev => ({ ...prev, visible: false }));
+          const status = await requestPermission('media');
+          if (status === 'granted' || status === 'limited') {
+            await processImagePicker();
+          }
+        }
+      });
     }
+  };
 
+  const processCamera = async () => {
+    const pickerResult = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+    });
+
+    if (!pickerResult.canceled && pickerResult.assets) {
+      const uris = pickerResult.assets.map((asset) => asset.uri);
+      setSelectedImages((prev) => [...prev, ...uris]);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    if (publishing) return;
+
+    if (permissions.camera === 'granted') {
+      await processCamera();
+    } else if (permissions.camera === 'denied') {
+      Alert.alert('Permission Denied', 'Please enable camera access in settings to take photos.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open Settings', onPress: openSettings }
+      ]);
+    } else if (permissions.camera === 'unavailable') {
+      Alert.alert('Camera Unavailable', 'Your device does not support taking photos.');
+    } else {
+      setPermissionModal({
+        visible: true,
+        type: 'camera',
+        title: 'Access Camera',
+        description: 'Capture beautiful photos of your property right now to share with potential buyers or renters.',
+        onContinue: async () => {
+          setPermissionModal(prev => ({ ...prev, visible: false }));
+          const status = await requestPermission('camera');
+          if (status === 'granted') {
+            await processCamera();
+          }
+        }
+      });
+    }
+  };
+
+  const processVideoPicker = async () => {
     const pickerResult = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['videos'],
       allowsEditing: true,
@@ -379,6 +452,33 @@ export default function OwnerUploadScreen() {
       } catch (err: any) {
         showToast(err.message || 'Video validation failed.', 'warning');
       }
+    }
+  };
+
+  const handlePickVideo = async () => {
+    if (publishing) return;
+    
+    if (permissions.media === 'granted' || permissions.media === 'limited') {
+      await processVideoPicker();
+    } else if (permissions.media === 'denied') {
+      Alert.alert('Permission Denied', 'Please enable photo library access in settings to upload your walkthrough.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open Settings', onPress: openSettings }
+      ]);
+    } else {
+      setPermissionModal({
+        visible: true,
+        type: 'media',
+        title: 'Upload Walkthrough',
+        description: 'Upload an immersive 9:16 vertical walkthrough video to give buyers a true feel of the property.',
+        onContinue: async () => {
+          setPermissionModal(prev => ({ ...prev, visible: false }));
+          const status = await requestPermission('media');
+          if (status === 'granted' || status === 'limited') {
+            await processVideoPicker();
+          }
+        }
+      });
     }
   };
 
@@ -574,7 +674,8 @@ export default function OwnerUploadScreen() {
   }
 
   return (
-    <ScreenContainer style={styles.container} scrollable>
+    <>
+      <ScreenContainer style={styles.container} scrollable>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} disabled={publishing}>
@@ -596,19 +697,30 @@ export default function OwnerUploadScreen() {
             disabled={publishing}
           >
             <ImageIcon size={24} color={Theme.colors.primary} />
-            <Text style={styles.dropzoneTitle}>Select Images</Text>
-            <Text style={styles.dropzoneSub}>Pick up to 5 photos</Text>
+            <Text style={styles.dropzoneTitle}>Gallery</Text>
+            <Text style={styles.dropzoneSub}>Pick photos</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            activeOpacity={Theme.motion.presets.press.scale}
+            onPress={handleTakePhoto}
+            style={[styles.mediaDropzone, { flex: 1 }]}
+            disabled={publishing}
+          >
+            <Camera size={24} color={Theme.colors.primary} />
+            <Text style={styles.dropzoneTitle}>Camera</Text>
+            <Text style={styles.dropzoneSub}>Take photo</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             activeOpacity={Theme.motion.presets.press.scale}
             onPress={handlePickVideo}
-            style={[styles.mediaDropzone, { flex: 1 }]}
+            style={[styles.mediaDropzone, { flex: 1.2 }]}
             disabled={publishing}
           >
             <Video size={24} color={Theme.colors.primary} />
-            <Text style={styles.dropzoneTitle}>Select Video</Text>
-            <Text style={styles.dropzoneSub}>9:16 vertical walkthrough</Text>
+            <Text style={styles.dropzoneTitle}>Video</Text>
+            <Text style={styles.dropzoneSub}>9:16 walkthrough</Text>
           </TouchableOpacity>
         </View>
 
@@ -976,6 +1088,16 @@ export default function OwnerUploadScreen() {
       </View>
 
     </ScreenContainer>
+      
+      <PermissionModal
+        visible={permissionModal.visible}
+        type={permissionModal.type}
+        title={permissionModal.title}
+        description={permissionModal.description}
+        onContinue={permissionModal.onContinue}
+        onCancel={() => setPermissionModal(prev => ({ ...prev, visible: false }))}
+      />
+    </>
   );
 }
 

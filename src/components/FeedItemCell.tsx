@@ -6,6 +6,7 @@ import { Theme } from '../theme';
 import { formatCurrency } from '../utils';
 import { MapPin, Sparkles, Phone, Flag, Bookmark } from 'lucide-react-native';
 import { UnifiedMediaCarousel } from './UnifiedMediaCarousel';
+import { AnimatedPressable } from './AnimatedPressable';
 import { Button } from './Button';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -172,34 +173,34 @@ const FeedItemCellComponent: React.FC<FeedItemCellProps> = ({
 
         <View style={styles.sidebar}>
           {/* Save Action */}
-          <TouchableOpacity
-            activeOpacity={0.8}
+          <AnimatedPressable
             style={[styles.sidebarBtn, isSaved && styles.sidebarBtnActive]}
             onPress={() => onSavePress(item.id)}
+            scaleTo={0.9}
           >
             <AnimatedBookmark
               size={22}
               color={isSaved ? Theme.colors.primary : Theme.colors.textPrimary}
             />
-          </TouchableOpacity>
+          </AnimatedPressable>
 
           {/* Quick Call Action */}
-          <TouchableOpacity
-            activeOpacity={0.8}
+          <AnimatedPressable
             style={styles.sidebarBtn}
             onPress={() => onQuickCall(item)}
+            scaleTo={0.9}
           >
             <Phone size={20} color={Theme.colors.textPrimary} />
-          </TouchableOpacity>
+          </AnimatedPressable>
 
           {/* Report Listing Flag Button */}
-          <TouchableOpacity
-            activeOpacity={0.8}
+          <AnimatedPressable
             style={styles.sidebarBtn}
             onPress={() => onReportPress(item.id)}
+            scaleTo={0.9}
           >
             <Flag size={18} color={Theme.colors.textPrimary} />
-          </TouchableOpacity>
+          </AnimatedPressable>
         </View>
       </View>
     </View>

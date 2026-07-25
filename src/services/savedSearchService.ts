@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { SavedSearch } from '../types';
-import { SearchFilters } from '../components/SearchOverlay';
+import { SearchFilters } from '../features/discovery/components/FilterSheet';
 
 export const savedSearchService = {
   /**

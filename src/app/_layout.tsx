@@ -14,6 +14,7 @@ import { Theme } from '../theme';
 
 import { FeedbackProvider } from '../context/FeedbackContext';
 import { ListingVerificationModal } from '../components/ListingVerificationModal';
+import { PermissionProvider } from '../features/permissions/providers/PermissionProvider';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -104,51 +105,53 @@ export default function RootLayout() {
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          <FeedbackProvider>
-            <AuthProvider>
-              <ProfileProvider>
-                <PropertyProvider>
-                  <DeepLinkHandler />
-                  <Stack
-                    screenOptions={{
-                      headerShown: false,
-                      contentStyle: {
-                        backgroundColor: Theme.colors.background,
-                      },
-                    }}
-                  >
-                    <Stack.Screen name="index" />
-                    <Stack.Screen name="onboarding" />
-                    <Stack.Screen name="login" />
-                    <Stack.Screen name="register" />
-                    <Stack.Screen name="search" />
-                    <Stack.Screen name="(tabs)" />
-                    <Stack.Screen
-                      name="collection/[id]"
-                      options={{ presentation: 'card' }}
-                    />
-                    <Stack.Screen
-                      name="compare/index"
-                      options={{ presentation: 'card' }}
-                    />
-                    <Stack.Screen
-                      name="owner/upload"
-                      options={{ presentation: 'modal' }}
-                    />
-                    <Stack.Screen
-                      name="owner/success"
-                      options={{ presentation: 'card' }}
-                    />
-                    <Stack.Screen
-                      name="settings"
-                      options={{ presentation: 'card' }}
-                    />
-                  </Stack>
-                  <ListingVerificationModal />
-                </PropertyProvider>
-              </ProfileProvider>
-            </AuthProvider>
-          </FeedbackProvider>
+          <PermissionProvider>
+            <FeedbackProvider>
+              <AuthProvider>
+                <ProfileProvider>
+                  <PropertyProvider>
+                    <DeepLinkHandler />
+                    <Stack
+                      screenOptions={{
+                        headerShown: false,
+                        contentStyle: {
+                          backgroundColor: Theme.colors.background,
+                        },
+                      }}
+                    >
+                      <Stack.Screen name="index" />
+                      <Stack.Screen name="onboarding" />
+                      <Stack.Screen name="login" />
+                      <Stack.Screen name="register" />
+                      <Stack.Screen name="search" />
+                      <Stack.Screen name="(tabs)" />
+                      <Stack.Screen
+                        name="collection/[id]"
+                        options={{ presentation: 'card' }}
+                      />
+                      <Stack.Screen
+                        name="compare/index"
+                        options={{ presentation: 'card' }}
+                      />
+                      <Stack.Screen
+                        name="owner/upload"
+                        options={{ presentation: 'modal' }}
+                      />
+                      <Stack.Screen
+                        name="owner/success"
+                        options={{ presentation: 'card' }}
+                      />
+                      <Stack.Screen
+                        name="settings"
+                        options={{ presentation: 'card' }}
+                      />
+                    </Stack>
+                    <ListingVerificationModal />
+                  </PropertyProvider>
+                </ProfileProvider>
+              </AuthProvider>
+            </FeedbackProvider>
+          </PermissionProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>

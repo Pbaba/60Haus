@@ -26,6 +26,8 @@ import { Button } from '../../components/Button';
 import { ReportListingModal } from '../../components/ReportListingModal';
 import { DiscoveryEndScreen } from '../../components/DiscoveryEndScreen';
 import { FeedItemCell } from '../../components/FeedItemCell';
+import { EmptyState } from '../../components/EmptyState';
+import { Home } from 'lucide-react-native';
 import { AMENITIES } from '../../constants/property';
 import { SkeletonFeed } from '../../components/Skeleton';
 import { locationDomain, reactNativeMapProvider, NeighborhoodSnapshot } from '../../domain/location';
@@ -36,7 +38,7 @@ import { useProperties } from '../../hooks/useProperties';
 import { Theme } from '../../theme';
 import { formatCurrency } from '../../utils';
 import { PropertyListing, DiscoveryMode } from '../../types';
-import { SearchFilters } from '../../components/SearchOverlay';
+import { SearchFilters } from '../../features/discovery/components/FilterSheet';
 import { reportService } from '../../services/reportService';
 import { analyticsService } from '../../services/analyticsService';
 
@@ -409,7 +411,7 @@ export default function FeedScreen() {
         <View style={styles.page}>
           <DiscoveryEndScreen
             isActive={isActive}
-            onOpenFilters={() => router.replace('/(tabs)/search' as any)}
+            onOpenFilters={() => router.push('/(tabs)/discover' as any)}
           />
         </View>
       );
@@ -492,36 +494,19 @@ export default function FeedScreen() {
             />
           }
         />
-      ) : (
-        <View style={styles.emptyContainer}>
-          <View style={styles.emptyHeaderSection}>
-            <Text style={styles.emptyGreeting}>{getWelcomeGreeting()}</Text>
-            <Text style={styles.emptySubtitle}>Find your next home.</Text>
-            <Button
-              variant="primary"
-              style={styles.emptyActionBtn}
-              onPress={() => router.replace('/(tabs)/discover' as any)}
-            >
-              Discover Properties
-            </Button>
-          </View>
-
-          <View style={styles.emptyDivider} />
-
-          <View style={styles.emptyBodySection}>
-            <Text style={styles.emptyFeedbackTitle}>No listings available yet.</Text>
-            <Text style={styles.emptyFeedbackSubtitle}>
-              Try adjusting your search or check back later.
-            </Text>
-            <Button
-              variant="secondary"
-              style={styles.emptyActionBtn}
-              onPress={handleRefresh}
-            >
-              Refresh Feed
-            </Button>
-          </View>
-        </View>
+        <EmptyState
+          icon={Home}
+          title="No properties available"
+          description="We couldn't find any listings matching your search. Try adjusting your filters or check back later."
+          actionLabel="Edit Filters"
+          onAction={() => router.push('/(tabs)/discover' as any)}
+          secondaryActionLabel="Reset Filters"
+          onSecondaryAction={() => {
+            // Need to reset filters and refresh
+            setFilters({ city: 'Mumbai', listingType: 'rent', bhk: null, furnishing: null, petFriendly: false });
+            fetchFeed(true);
+          }}
+        />
       )}
 
       {/* Property Details Bottom Sheet Overlay */}

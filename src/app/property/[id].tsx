@@ -12,6 +12,10 @@ import { FullscreenGallery } from '../../components/FullscreenGallery';
 import { useProperties } from '../../hooks/useProperties';
 import { useAuth } from '../../hooks/useAuth';
 import { useFeedback } from '../../context/FeedbackContext';
+import { SearchFilters } from '../../features/discovery/components/FilterSheet';
+import { reportService } from '../../services/reportService';
+import { analyticsService } from '../../services/analyticsService';
+import { SimilarProperties } from '../../features/discovery/components/SimilarProperties';
 import { profileService } from '../../services/profileService';
 import { discoveryService } from '../../services/discoveryService';
 import { historyService } from '../../services/historyService';
@@ -814,31 +818,7 @@ export default function PropertyDetailScreen() {
             <ShieldAlert size={18} color={Theme.colors.danger || '#FF3B30'} />
             <Text style={styles.reportListingText}>Report listing errors, spam or suspicious pricing</Text>
           </TouchableOpacity>
-          {related.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Related Listings</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.relatedScroll}>
-                {related.map((item) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={styles.relatedCard}
-                    onPress={() => router.push(`/property/${item.id}` as any)}
-                  >
-                    <Image
-                      source={{ uri: item.thumbnailUrl }}
-                      style={styles.relatedThumb}
-                      contentFit="cover"
-                    />
-                    <View style={styles.relatedInfo}>
-                      <Text style={styles.relatedPrice}>{formatCurrency(item.price)}</Text>
-                      <Text style={styles.relatedTitle} numberOfLines={1}>{item.title}</Text>
-                      <Text style={styles.relatedCity}>{item.city}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
+          <SimilarProperties property={property} />
 
           <Button
             variant="primary"

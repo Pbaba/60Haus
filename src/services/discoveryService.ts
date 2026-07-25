@@ -1,11 +1,11 @@
 import { PropertyListing, DiscoveryMode } from '../types';
-import { SearchFilters } from '../components/SearchOverlay';
+import { SearchFilters } from '../features/discovery/components/FilterSheet';
 import { propertySearchService } from './propertySearchService';
 import { supabase } from '../lib/supabase';
 import { bookmarkService } from './bookmarkService';
 import { historyService } from './historyService';
 
-import { personalizationService } from './personalizationService';
+import { discoveryRankingService } from '../features/discovery/services/discoveryRankingService';
 import { enrichPropertyListing } from '../utils/propertyIntelligence';
 
 export interface DiscoveryStrategyInput {
@@ -33,7 +33,7 @@ function rankListings(
   savedProperties: PropertyListing[] = [],
   recentlyViewedProperties: PropertyListing[] = []
 ): PropertyListing[] {
-  return personalizationService.rankProperties(
+  return discoveryRankingService.rankProperties(
     listings,
     userPref,
     savedProperties,
@@ -298,99 +298,8 @@ export const discoveryService = {
     return result.listings.map((item) => ({ ...item, reason: result.reason }));
   },
 
-  // Recommendations: matches similar listings based on city, locality, type, bedrooms
+  // Recommendations: delegates to discoveryRankingService
   async getRecommendations(property: PropertyListing, limit: number = 5): Promise<PropertyListing[]> {
-    try {
-      const { data, error } = await supabase
-        .from('properties')
-        .select('*, property_images(image_url), property_videos(video_url, thumbnail_url)')
-        .eq('status', 'published')
-        .is('deleted_at', null)
-        .neq('id', property.id)
-        .limit(30);
-
-      if (error) throw error;
-      if (!data) return [];
-
-      const mappedCandidates: PropertyListing[] = data.map((item: any) => {
-        const videoRecord = item.property_videos && item.property_videos[0];
-        return enrichPropertyListing({
-          id: item.id,
-          ownerId: item.owner_id,
-          title: item.title,
-          description: item.description,
-          price: Number(item.price),
-          listingType: item.listing_type,
-          city: item.city,
-          locality: item.locality,
-          address: item.address,
-          bedrooms: item.bedrooms,
-          bathrooms: item.bathrooms,
-          furnishing: item.furnishing,
-          thumbnailUrl: videoRecord?.thumbnail_url || item.thumbnail_url,
-          videoUrl: videoRecord?.video_url || '',
-          createdAt: item.created_at,
-          imageUrls: item.property_images ? item.property_images.map((img: any) => img.image_url) : [],
-          amenities: item.amenities,
-          viewCount: item.view_count || 0,
-          is_sponsored: item.is_sponsored,
-          priority_score: item.priority_score,
-          carpetArea: item.carpet_area ? Number(item.carpet_area) : undefined,
-          builtUpArea: item.built_up_area ? Number(item.built_up_area) : undefined,
-          superBuiltUpArea: item.super_built_up_area ? Number(item.super_built_up_area) : undefined,
-          plotArea: item.plot_area ? Number(item.plot_area) : undefined,
-          propertyAge: item.property_age ? Number(item.property_age) : undefined,
-          possessionStatus: item.possession_status || undefined,
-          ownershipType: item.ownership_type || undefined,
-          securityDeposit: item.security_deposit ? Number(item.security_deposit) : undefined,
-          monthlyMaintenance: item.monthly_maintenance ? Number(item.monthly_maintenance) : undefined,
-          brokerage: item.brokerage ? Number(item.brokerage) : undefined,
-          leaseDuration: item.lease_duration ? Number(item.lease_duration) : undefined,
-          availableFrom: item.available_from || undefined,
-          preferredTenant: item.preferred_tenant || undefined,
-          status: item.status,
-        });
-      });
-
-      const scored = mappedCandidates.map((candidate) => {
-        let matchScore = 0;
-        
-        if (candidate.city.toLowerCase() === property.city.toLowerCase()) {
-          matchScore += 5;
-        }
-        
-        const candidateRaw = candidate as any;
-        const propRaw = property as any;
-        if (candidateRaw.locality && propRaw.locality && 
-            candidateRaw.locality.toLowerCase() === propRaw.locality.toLowerCase()) {
-          matchScore += 4;
-        }
-        
-        if (candidate.bedrooms === property.bedrooms) {
-          matchScore += 3;
-        }
-        
-        if (candidate.listingType === property.listingType) {
-          matchScore += 2;
-        }
-
-        const candidatePropType = candidateRaw.propertyType || candidateRaw.property_type;
-        const propType = propRaw.propertyType || propRaw.property_type;
-        if (candidatePropType && propType && 
-            candidatePropType.toLowerCase() === propType.toLowerCase()) {
-          matchScore += 2;
-        }
-
-        return { candidate, matchScore };
-      });
-
-      return scored
-        .sort((a, b) => b.matchScore - a.matchScore)
-        .slice(0, limit)
-        .map((x) => x.candidate);
-    } catch (e) {
-      console.warn('Recommendations query failed:', e);
-      return [];
-    }
+    return discoveryRankingService.getSimilarProperties(property, limit);
   },
 };

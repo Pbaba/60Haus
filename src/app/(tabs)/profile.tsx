@@ -9,7 +9,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useProfile } from '../../hooks/useProfile';
 import { useProperties } from '../../hooks/useProperties';
 import { Theme } from '../../theme';
-import { ChevronRight, Settings, HelpCircle, Heart, Building, User } from 'lucide-react-native';
+import { ChevronRight, Settings, HelpCircle, Heart, Building, User, Shield } from 'lucide-react-native';
 import { formatCurrency } from '../../utils';
 import { Image } from 'expo-image';
 import { Button } from '../../components/Button';
@@ -235,6 +235,17 @@ export default function ProfileScreen() {
             <View style={styles.rowLabel}>
               <Settings size={20} color={Theme.colors.textSecondary} />
               <Text style={styles.rowText}>Settings</Text>
+            </View>
+            <ChevronRight size={18} color={Theme.colors.textMuted} />
+          </TouchableOpacity>
+
+          <View style={styles.rowDivider} />
+
+          {/* Privacy & Permissions */}
+          <TouchableOpacity style={styles.rowItem} onPress={() => router.push('/settings/privacy' as any)}>
+            <View style={styles.rowLabel}>
+              <Shield size={20} color={Theme.colors.textSecondary} />
+              <Text style={styles.rowText}>Privacy & Permissions</Text>
             </View>
             <ChevronRight size={18} color={Theme.colors.textMuted} />
           </TouchableOpacity>
