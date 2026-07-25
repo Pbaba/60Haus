@@ -7,10 +7,17 @@ import {
   TouchableOpacity,
   Dimensions,
   FlatList,
-  ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { X } from 'lucide-react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  runOnJS,
+} from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Theme } from '../theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -21,6 +28,94 @@ interface FullscreenGalleryProps {
   initialIndex: number;
   onClose: () => void;
 }
+
+const ZoomableImage = ({ uri, onClose }: { uri: string; onClose: () => void }) => {
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const savedTranslateX = useSharedValue(0);
+  const savedTranslateY = useSharedValue(0);
+
+  const pinchGesture = Gesture.Pinch()
+    .onUpdate((e) => {
+      scale.value = savedScale.value * e.scale;
+    })
+    .onEnd(() => {
+      if (scale.value < 1) {
+        scale.value = withSpring(1);
+        translateX.value = withSpring(0);
+        translateY.value = withSpring(0);
+      }
+      savedScale.value = scale.value;
+    });
+
+  const panGesture = Gesture.Pan()
+    .onUpdate((e) => {
+      if (scale.value > 1) {
+        translateX.value = savedTranslateX.value + e.translationX;
+        translateY.value = savedTranslateY.value + e.translationY;
+      } else {
+        // Allow swipe down to dismiss if not zoomed in
+        if (e.translationY > 0) {
+          translateY.value = e.translationY;
+        }
+      }
+    })
+    .onEnd((e) => {
+      if (scale.value > 1) {
+        savedTranslateX.value = translateX.value;
+        savedTranslateY.value = translateY.value;
+      } else {
+        if (e.translationY > 100) {
+          runOnJS(onClose)();
+        } else {
+          translateY.value = withSpring(0);
+        }
+      }
+    });
+
+  const doubleTapGesture = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      if (scale.value > 1) {
+        scale.value = withSpring(1);
+        translateX.value = withSpring(0);
+        translateY.value = withSpring(0);
+        savedScale.value = 1;
+        savedTranslateX.value = 0;
+        savedTranslateY.value = 0;
+      } else {
+        scale.value = withSpring(2.5);
+        savedScale.value = 2.5;
+      }
+    });
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { translateX: translateX.value },
+        { translateY: translateY.value },
+        { scale: scale.value },
+      ],
+    };
+  });
+
+  const composed = Gesture.Simultaneous(pinchGesture, panGesture, doubleTapGesture);
+
+  return (
+    <GestureDetector gesture={composed}>
+      <Animated.View style={[styles.zoomContainer, animatedStyle]}>
+        <Image
+          source={{ uri }}
+          style={styles.image}
+          contentFit="contain"
+          transition={300}
+        />
+      </Animated.View>
+    </GestureDetector>
+  );
+};
 
 export const FullscreenGallery: React.FC<FullscreenGalleryProps> = ({
   visible,
@@ -43,17 +138,15 @@ export const FullscreenGallery: React.FC<FullscreenGalleryProps> = ({
       onRequestClose={onClose}
     >
       <View style={styles.container}>
-        {/* Gallery header controls */}
         <View style={styles.header}>
           <Text style={styles.indicator}>
             {activeIndex + 1} / {images.length}
           </Text>
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Close gallery">
+          <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8}>
             <X size={22} color="#FFF" />
           </TouchableOpacity>
         </View>
 
-        {/* Paging lists */}
         <FlatList
           data={images}
           horizontal
@@ -68,19 +161,7 @@ export const FullscreenGallery: React.FC<FullscreenGalleryProps> = ({
           onMomentumScrollEnd={onMomentumScrollEnd}
           keyExtractor={(item, index) => index.toString()}
           renderItem={({ item }) => (
-            <ScrollView
-              maximumZoomScale={3.5}
-              minimumZoomScale={1}
-              showsHorizontalScrollIndicator={false}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.zoomContainer}
-            >
-              <Image
-                source={{ uri: item }}
-                style={styles.image}
-                contentFit="contain"
-              />
-            </ScrollView>
+            <ZoomableImage uri={item} onClose={onClose} />
           )}
         />
       </View>

@@ -60,7 +60,34 @@
       "expo-image",
       "expo-status-bar",
       "expo-web-browser",
-      "react-native-compressor"
+      "react-native-compressor",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow 60Haus to access your camera to capture property walkthroughs and photos.",
+          "microphonePermission": "Allow 60Haus to access your microphone to record audio for property walkthroughs."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow 60Haus to use your location to find nearby properties.",
+          "locationWhenInUsePermission": "Allow 60Haus to use your location to find nearby properties."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow 60Haus to access your photos to upload property listings."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#E6F4FE"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

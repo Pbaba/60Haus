@@ -3,9 +3,12 @@ import { StyleSheet, View, Text, Pressable, Dimensions, FlatList, ActivityIndica
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Image } from 'expo-image';
 import { Heart, Volume2, VolumeX, RefreshCw } from 'lucide-react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withDelay, runOnJS } from 'react-native-reanimated';
+import Animated, { runOnJS } from 'react-native-reanimated';
+import { GestureDetector } from 'react-native-gesture-handler';
 import { Theme } from '../theme';
-import { hapticsService } from '../services/hapticsService';
+import { useHaptics } from '../hooks/useHaptics';
+import { useDoubleTap } from '../hooks/useDoubleTap';
+import { HeartBurst, HeartBurstRef } from './HeartBurst';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -110,7 +113,12 @@ const ActiveVideoSlide = React.memo(({
       />
 
       {(!isReady || hasError) && thumbnailUrl && (
-        <Image source={{ uri: thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        <Image 
+          source={{ uri: thumbnailUrl }} 
+          style={StyleSheet.absoluteFill} 
+          contentFit="cover"
+          transition={300}
+        />
       )}
 
       {!isReady && !hasError && (
@@ -163,7 +171,12 @@ const VideoSlide = React.memo(({
   return (
     <View style={styles.slideWrapper}>
       {thumbnailUrl && (
-        <Image source={{ uri: thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        <Image 
+          source={{ uri: thumbnailUrl }} 
+          style={StyleSheet.absoluteFill} 
+          contentFit="cover"
+          transition={300}
+        />
       )}
     </View>
   );
@@ -200,40 +213,16 @@ export const UnifiedMediaCarousel: React.FC<UnifiedMediaCarouselProps> = React.m
   }, [item.videoUrl, item.thumbnailUrl, item.imageUrls]);
 
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-  const [showHeart, setShowHeart] = useState(false);
-  const lastTap = useRef<number>(0);
-  const heartScale = useSharedValue(0);
-  const heartOpacity = useSharedValue(0);
+  const heartBurstRef = useRef<HeartBurstRef>(null);
+  const haptics = useHaptics();
 
-  const triggerHeartAnimation = React.useCallback(() => {
-    setShowHeart(true);
-    heartScale.value = 0;
-    heartOpacity.value = 0;
+  const handleDoubleTap = React.useCallback(() => {
+    haptics.light();
+    heartBurstRef.current?.trigger();
+    onDoubleTapSave?.();
+  }, [haptics, onDoubleTapSave]);
 
-    heartScale.value = withSpring(1.3, { damping: 10, stiffness: 200 }, () => {
-      heartScale.value = withSpring(1, { damping: 12 });
-    });
-    heartOpacity.value = withTiming(1, { duration: 180 }, () => {
-      heartOpacity.value = withDelay(400, withTiming(0, { duration: 200 }, () => {
-        runOnJS(setShowHeart)(false);
-      }));
-    });
-  }, [heartScale, heartOpacity]);
-
-  const handlePress = React.useCallback(() => {
-    const now = Date.now();
-    if (now - lastTap.current < 320) {
-      hapticsService.light();
-      triggerHeartAnimation();
-      onDoubleTapSave?.();
-    }
-    lastTap.current = now;
-  }, [triggerHeartAnimation, onDoubleTapSave]);
-
-  const heartStyle = useAnimatedStyle(() => ({
-    opacity: heartOpacity.value,
-    transform: [{ scale: heartScale.value }],
-  }));
+  const doubleTapGesture = useDoubleTap(handleDoubleTap);
 
   const handleScroll = React.useCallback((event: any) => {
     const index = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
@@ -245,38 +234,44 @@ export const UnifiedMediaCarousel: React.FC<UnifiedMediaCarouselProps> = React.m
   const renderItem = React.useCallback(({ item: slide, index, extraData: activeSlideIndex }: any) => {
     if (slide.type === 'video') {
       return (
-        <Pressable style={styles.slideWrapper} onPress={handlePress}>
-          <VideoSlide
-            videoUrl={slide.url}
-            thumbnailUrl={slide.thumbnailUrl}
-            isActive={isActive}
-            isCarouselActive={index === activeSlideIndex}
-            isMuted={isMuted}
-            onToggleMute={onToggleMute}
-            onViewCountIncrement={onViewCountIncrement}
-            shouldLoad={shouldLoad}
-          />
-        </Pressable>
+        <GestureDetector gesture={doubleTapGesture}>
+          <View style={styles.slideWrapper}>
+            <VideoSlide
+              videoUrl={slide.url}
+              thumbnailUrl={slide.thumbnailUrl}
+              isActive={isActive}
+              isCarouselActive={index === activeSlideIndex}
+              isMuted={isMuted}
+              onToggleMute={onToggleMute}
+              onViewCountIncrement={onViewCountIncrement}
+              shouldLoad={shouldLoad}
+            />
+          </View>
+        </GestureDetector>
       );
     } else {
       return (
-        <Pressable style={styles.slideWrapper} onPress={handlePress}>
-          <Image
-            source={{ uri: slide.url }}
-            style={styles.backgroundImage}
-            contentFit="cover"
-            blurRadius={32}
-          />
-          <View style={styles.darkOverlay} />
-          <Image
-            source={{ uri: slide.url }}
-            style={styles.foregroundImage}
-            contentFit="contain"
-          />
-        </Pressable>
+        <GestureDetector gesture={doubleTapGesture}>
+          <View style={styles.slideWrapper}>
+            <Image
+              source={{ uri: slide.url }}
+              style={styles.backgroundImage}
+              contentFit="cover"
+              blurRadius={32}
+              transition={400}
+            />
+            <View style={styles.darkOverlay} />
+            <Image
+              source={{ uri: slide.url }}
+              style={styles.foregroundImage}
+              contentFit="contain"
+              transition={300}
+            />
+          </View>
+        </GestureDetector>
       );
     }
-  }, [handlePress, isActive, isMuted, onToggleMute, onViewCountIncrement, shouldLoad]);
+  }, [doubleTapGesture, isActive, isMuted, onToggleMute, onViewCountIncrement, shouldLoad]);
 
   return (
     <View style={styles.container}>
@@ -310,11 +305,7 @@ export const UnifiedMediaCarousel: React.FC<UnifiedMediaCarouselProps> = React.m
         </View>
       )}
 
-      {showHeart && (
-        <Animated.View style={[styles.heartOverlay, heartStyle]} pointerEvents="none">
-          <Heart size={72} color="#FFFFFF" fill="#FFFFFF" />
-        </Animated.View>
-      )}
+      <HeartBurst ref={heartBurstRef} />
     </View>
   );
 });
@@ -353,16 +344,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  heartOverlay: {
-    position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    width: 110,
-    height: 110,
-    borderRadius: 55,
   },
   errorContainer: {
     position: 'absolute',

@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Plus, X, Trash2 } from 'lucide-react-native';
-import { SearchFilters } from './SearchOverlay';
+import { SearchFilters } from '../features/discovery/components/FilterSheet';
 import { Theme } from '../theme';
 import { hapticsService } from '../services/hapticsService';
 

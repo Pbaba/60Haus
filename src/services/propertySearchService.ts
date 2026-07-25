@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { PropertyListing } from '../types';
-import { SearchFilters } from '../components/SearchOverlay';
+import { SearchFilters } from '../features/discovery/components/FilterSheet';
 import { enrichPropertyListing } from '../utils/propertyIntelligence';
 import { locationDomain } from '../domain/location';
 

@@ -6,6 +6,9 @@ import { Button } from '../../components/Button';
 import { Theme } from '../../theme';
 import { CheckCircle, Share2, Compass, Eye } from 'lucide-react-native';
 import { useProperties } from '../../hooks/useProperties';
+import { usePermissions } from '../../features/permissions/hooks/usePermissions';
+import { PermissionModal } from '../../features/permissions/components/PermissionModal';
+import { PermissionType } from '../../features/permissions/types';
 
 export default function PublishSuccessScreen() {
   const router = useRouter();
@@ -21,6 +24,21 @@ export default function PublishSuccessScreen() {
     furnishing: string;
     listingType: 'rent' | 'buy';
   }>();
+  const { permissions, requestPermission } = usePermissions();
+
+  const [permissionModal, setPermissionModal] = React.useState<{
+    visible: boolean;
+    type: PermissionType;
+    title: string;
+    description: string;
+    onContinue: () => void;
+  }>({
+    visible: false,
+    type: 'notifications',
+    title: '',
+    description: '',
+    onContinue: () => {},
+  });
 
   // Prevent back action from returning to the upload form page
   React.useEffect(() => {
@@ -31,6 +49,25 @@ export default function PublishSuccessScreen() {
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
   }, [router]);
+
+  // Request notifications after successful publish
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (permissions.notifications === 'undetermined') {
+        setPermissionModal({
+          visible: true,
+          type: 'notifications',
+          title: 'Stay Informed',
+          description: 'Receive verifications, inquiries, and marketplace updates for your new listing.',
+          onContinue: async () => {
+            setPermissionModal(prev => ({ ...prev, visible: false }));
+            await requestPermission('notifications');
+          }
+        });
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [permissions.notifications, requestPermission]);
 
   const handleShare = async () => {
     try {
@@ -129,6 +166,15 @@ export default function PublishSuccessScreen() {
           <Text style={styles.doneText}>Go to Dashboard</Text>
         </TouchableOpacity>
       </View>
+      
+      <PermissionModal
+        visible={permissionModal.visible}
+        type={permissionModal.type}
+        title={permissionModal.title}
+        description={permissionModal.description}
+        onContinue={permissionModal.onContinue}
+        onCancel={() => setPermissionModal(prev => ({ ...prev, visible: false }))}
+      />
     </ScreenContainer>
   );
 }
