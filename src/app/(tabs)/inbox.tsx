@@ -58,6 +58,10 @@ export default function InboxScreen() {
         refreshControl={
           <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={Theme.colors.primary} />
         }
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={true}
         ListEmptyComponent={renderEmptyState}
       />
     </ScreenContainer>

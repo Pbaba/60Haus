@@ -34,7 +34,7 @@ import { AchievementCard } from '../../features/analytics/components/Achievement
 import { AudienceInsights } from '../../features/analytics/components/AudienceInsights';
 
 function ListingAnalyticsSection({ propertyId }: { propertyId: string }) {
-  const { loading, stats, funnel, dailyMetrics } = useListingAnalytics(propertyId);
+  const { loading, stats, funnel } = useListingAnalytics(propertyId);
   const { suggestions } = useInsights(stats);
 
   if (loading) return null;
@@ -91,8 +91,8 @@ export default function OwnerDashboardScreen() {
     try {
       const data = await propertyService.getOwnerDashboardStats(profile.id);
       setProperties(data.listings);
-    } catch (e) {
-      console.error('Failed to load listings:', e);
+    } catch {
+      console.error('Failed to load listings');
       setError(true);
     } finally {
       setLoading(false);
@@ -133,7 +133,7 @@ export default function OwnerDashboardScreen() {
       setConfirmArchiveId(null);
       setConfirmRestoreId(null);
       await fetchListings();
-    } catch (e: any) {
+    } catch {
       alert(`${action} failed. Please try again.`);
     } finally {
       setDialogLoading(false);
@@ -264,7 +264,7 @@ export default function OwnerDashboardScreen() {
             ))}
           </View>
         ) : (
-          <EmptyState title="No properties found." description="You haven't listed any properties yet." icon="home" actionLabel="Create Listing" onAction={() => router.push('/owner/upload' as any)} />
+          <EmptyState title="No properties found." description="You haven't listed any properties yet." actionLabel="Create Listing" onAction={() => router.push('/owner/upload' as any)} />
         )}
       </ScrollView>
 

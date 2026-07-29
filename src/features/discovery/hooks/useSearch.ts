@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { historyService } from '../services/historyService';
+import { historyService } from '../../../services/historyService';
 
 export const useSearch = (userId?: string) => {
   const [query, setQuery] = useState('');
@@ -25,7 +25,7 @@ export const useSearch = (userId?: string) => {
     if (!userId) return;
     try {
       const history = await historyService.getSearchHistory(userId);
-      setRecentSearches(history.map(h => h.query));
+      setRecentSearches(history);
     } catch (e) {
       console.warn('Failed to load search history', e);
     }

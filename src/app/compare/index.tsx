@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Dimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Trash2, Check, AlertCircle } from 'lucide-react-native';
@@ -32,8 +31,8 @@ export default function CompareScreen() {
   const [model, setModel] = useState<ComparisonModel | null>(null);
 
   // Safely extract context variables
-  const properties = context?.properties || [];
-  const compareQueue = context?.compareQueue || [];
+  const properties = useMemo(() => context?.properties || [], [context?.properties]);
+  const compareQueue = useMemo(() => context?.compareQueue || [], [context?.compareQueue]);
   const toggleCompare = context?.toggleCompare || (() => {});
   const clearCompareQueue = context?.clearCompareQueue || (() => {});
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, TextInput, TouchableOpacity, TextInputProps } from 'react-native';
 import { Search, X } from 'lucide-react-native';
 import { Theme } from '../../../theme';
-import Animated, { useAnimatedStyle, withTiming, FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 interface SearchBarProps extends TextInputProps {
   value: string;
@@ -21,7 +21,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   ...props
 }) => {
   const [localValue, setLocalValue] = useState(value);
-  const debounceRef = useRef<NodeJS.Timeout>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setLocalValue(value);

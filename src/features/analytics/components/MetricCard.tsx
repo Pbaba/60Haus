@@ -14,9 +14,8 @@ interface MetricCardProps {
 }
 
 export function MetricCard({ title, value, icon: Icon, trend, trendLabel, highlight }: MetricCardProps) {
-  const isPositive = trend && trend > 0;
-  const isNegative = trend && trend < 0;
-  const isNeutral = trend === 0;
+  const isPositive = typeof trend === 'number' && trend > 0;
+  const isNegative = typeof trend === 'number' && trend < 0;
 
   return (
     <Card style={[styles.container, highlight && styles.highlighted]}>

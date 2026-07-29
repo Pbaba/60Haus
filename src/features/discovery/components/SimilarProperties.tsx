@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { PropertyListing } from '../../../types';
 import { discoveryRankingService } from '../services/discoveryRankingService';
 import { PropertyCarousel } from './PropertyCarousel';
@@ -27,7 +27,7 @@ export const SimilarProperties: React.FC<SimilarPropertiesProps> = ({ property }
     };
 
     fetchSimilar();
-  }, [property.id]); // re-fetch if property id changes
+  }, [property]); // re-fetch if property id changes
 
   if (loading || similarProperties.length === 0) {
     return null; // or return a skeleton loader if preferred

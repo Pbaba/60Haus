@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { StyleSheet, View, Text, Pressable, Dimensions, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, Dimensions, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Image } from 'expo-image';
-import { Heart, Volume2, VolumeX, RefreshCw } from 'lucide-react-native';
-import Animated, { runOnJS } from 'react-native-reanimated';
+import { Volume2, VolumeX, RefreshCw } from 'lucide-react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { Theme } from '../theme';
 import { useHaptics } from '../hooks/useHaptics';

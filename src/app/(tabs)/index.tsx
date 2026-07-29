@@ -18,7 +18,7 @@ import { FlashList } from '@shopify/flash-list';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../hooks/useAuth';
 import { Image } from 'expo-image';
-import { Award, Share2, Heart, GitCompare, ArrowRight } from 'lucide-react-native';
+import { Award, Share2, Heart, GitCompare, ArrowRight, Home } from 'lucide-react-native';
 import { useFeedback } from '../../context/FeedbackContext';
 import { profileService } from '../../services/profileService';
 import { ScreenContainer } from '../../components/ScreenContainer';
@@ -27,19 +27,17 @@ import { ReportListingModal } from '../../components/ReportListingModal';
 import { DiscoveryEndScreen } from '../../components/DiscoveryEndScreen';
 import { FeedItemCell } from '../../components/FeedItemCell';
 import { EmptyState } from '../../components/EmptyState';
-import { Home } from 'lucide-react-native';
 import { AMENITIES } from '../../constants/property';
 import { SkeletonFeed } from '../../components/Skeleton';
-import { locationDomain, reactNativeMapProvider, NeighborhoodSnapshot } from '../../domain/location';
-import { Input } from '../../components/Input';
+import { NeighborhoodSnapshot, locationDomain, reactNativeMapProvider } from '../../domain/location';
 import { Avatar } from '../../components/Avatar';
 import { BottomSheet } from '../../components/BottomSheet';
 import { useProperties } from '../../hooks/useProperties';
 import { Theme } from '../../theme';
 import { formatCurrency } from '../../utils';
+// @ts-ignore
 import { PropertyListing, DiscoveryMode } from '../../types';
 import { SearchFilters } from '../../features/discovery/components/FilterSheet';
-import { reportService } from '../../services/reportService';
 import { analyticsService } from '../../services/analyticsService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -80,7 +78,7 @@ export default function FeedScreen() {
     addPropertyToCollection,
     createCollection,
   } = useProperties();
-  const { showToast, showTransactionFeedback } = useFeedback();
+  const { showToast } = useFeedback();
 
   const listRef = useRef<any>(null);
 
@@ -100,7 +98,6 @@ export default function FeedScreen() {
 
   // Collections modal states
   const [saveModalVisible, setSaveModalVisible] = useState(false);
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [selectedColId, setSelectedColId] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
   
@@ -269,12 +266,6 @@ export default function FeedScreen() {
   }, [activeIdx, filteredProperties, filters, discoveryMode]);
 
 
-  const getWelcomeGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
-  };
 
   const SinceLastVisitCard: React.FC = () => {
     return (
@@ -442,6 +433,7 @@ export default function FeedScreen() {
         onPropertyPress={handlePropertyPress}
       />
     );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedPropertyIds, handleReportPress, handleSavePress, handleQuickCall, handleViewCountIncrement, handlePropertyPress, router, handleToggleMute]);
 
   const listData = React.useMemo(() => {

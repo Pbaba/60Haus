@@ -1,0 +1,47 @@
+* [33m144ab65[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdevelop[m[33m, [m[1;33mtag: [m[1;33mv1.0.0-beta.1[m[33m)[m release: prepare 60Haus v1.0.0-beta.1
+* [33m221ef2b[m release: complete v1 engineering and prepare 1.0.0-beta.1
+[31m|[m *   [33meb83dff[m[33m ([m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge pull request #11 from Pbaba/develop
+[31m|[m [32m|[m[31m\[m  
+[31m|[m [32m|[m[31m/[m  
+[31m|[m[31m/[m[32m|[m   
+* [32m|[m [33m675856e[m[33m ([m[1;31morigin/develop[m[33m)[m sprint 26
+* [32m|[m [33m523594f[m messaging system
+[33m|[m *   [33m94100ec[m Merge pull request #10 from Pbaba/develop
+[33m|[m [34m|[m[33m\[m  
+[33m|[m [34m|[m[33m/[m  
+[33m|[m[33m/[m[34m|[m   
+* [34m|[m [33mc840ac6[m discovery and some qol
+[35m|[m *   [33m03d48c6[m Merge pull request #9 from Pbaba/develop
+[35m|[m [36m|[m[35m\[m  
+[35m|[m [36m|[m[35m/[m  
+[35m|[m[35m/[m[36m|[m   
+* [36m|[m [33m7ecfdf0[m[33m ([m[1;33mtag: [m[1;33mv0.6.0[m[33m)[m feat(trust): implement marketplace integrity and trust ranking infrastructure
+[1;31m|[m *   [33mcbddb94[m Merge pull request #8 from Pbaba/develop
+[1;31m|[m [1;32m|[m[1;31m\[m  
+[1;31m|[m [1;32m|[m[1;31m/[m  
+[1;31m|[m[1;31m/[m[1;32m|[m   
+* [1;32m|[m [33m8692ed6[m feat: implement unified media carousel and discover experience
+[1;33m|[m *   [33m029cb2a[m # Sprint 15 & Sprint 16 — Personal Discovery, Trust & Verification
+[1;33m|[m [1;34m|[m[1;33m\[m  
+[1;33m|[m [1;34m|[m[1;33m/[m  
+[1;33m|[m[1;33m/[m[1;34m|[m   
+* [1;34m|[m [33mb48e07a[m feat: implement personal discovery and trust infrastructure
+[1;35m|[m *   [33m657c5d8[m Merge pull request #6 from Pbaba/develop
+[1;35m|[m [1;36m|[m[1;35m\[m  
+[1;35m|[m [1;36m|[m[1;35m/[m  
+[1;35m|[m[1;35m/[m[1;36m|[m   
+* [1;36m|[m [33m5f1b09e[m feat: implement personal discovery and smart search system
+[31m|[m *   [33maf57f81[m # Sprint 14 — Brand Identity, Production Polish & Launch Readiness
+[31m|[m [32m|[m[31m\[m  
+[31m|[m [32m|[m[31m/[m  
+[31m|[m[31m/[m[32m|[m   
+* [32m|[m [33mdc31e5f[m feat: establish 60Haus brand identity and production polish
+[33m|[m *   [33mdde6d21[m # Sprint 13 — Maps, Locality Intelligence & Commute Experience
+[33m|[m [34m|[m[33m\[m  
+[33m|[m [34m|[m[33m/[m  
+[33m|[m[33m/[m[34m|[m   
+* [34m|[m [33mf2d13b3[m feat: implement maps, locality intelligence, and commute experience
+[35m|[m *   [33m2c3f116[m v0.9.0-beta
+[35m|[m [36m|[m[35m\[m  
+[35m|[m [36m|[m[35m/[m  
+[35m|[m[35m/[m[36m|[m   

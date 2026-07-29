@@ -23,7 +23,7 @@ export default function ChatScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   
-  const { messages, loading: messagesLoading, sendMessage, refresh } = useConversation(id as string);
+  const { messages, sendMessage } = useConversation(id as string);
   const { updateStatus, isUpdating } = useLeadManagement();
   
   const [inputText, setInputText] = useState('');
@@ -133,6 +133,10 @@ export default function ChatScreen() {
             onVisitAction={handleVisitAction}
           />
         )}
+        initialNumToRender={20}
+        maxToRenderPerBatch={15}
+        windowSize={7}
+        removeClippedSubviews={true}
       />
 
       {/* Input Area */}

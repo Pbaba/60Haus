@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Theme } from '../../../theme';
-import { Users, MapPin, Clock, Home } from 'lucide-react-native';
+import { Users, MapPin, Clock } from 'lucide-react-native';
 
 interface AudienceInsightsProps {
   mockData?: boolean;

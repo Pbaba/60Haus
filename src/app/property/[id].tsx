@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Share, Linking, Alert, Modal, TextInput } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Share, Alert, Modal, TextInput } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -12,8 +12,6 @@ import { FullscreenGallery } from '../../components/FullscreenGallery';
 import { useProperties } from '../../hooks/useProperties';
 import { useAuth } from '../../hooks/useAuth';
 import { useFeedback } from '../../context/FeedbackContext';
-import { SearchFilters } from '../../features/discovery/components/FilterSheet';
-import { reportService } from '../../services/reportService';
 import { analyticsService } from '../../services/analyticsService';
 import { SimilarProperties } from '../../features/discovery/components/SimilarProperties';
 import { profileService } from '../../services/profileService';
@@ -56,7 +54,6 @@ export default function PropertyDetailScreen() {
 
   const [property, setProperty] = useState<PropertyListing | null>(null);
   const [ownerProfile, setOwnerProfile] = useState<UserProfile | null>(null);
-  const [related, setRelated] = useState<PropertyListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
@@ -145,8 +142,7 @@ export default function PropertyDetailScreen() {
 
       // 3. Fetch related listing recommendation models
       try {
-        const recommendations = await discoveryService.getRecommendations(mappedProperty);
-        setRelated(recommendations);
+        await discoveryService.getRecommendations(mappedProperty);
       } catch (recErr) {
         console.warn('Failed to load related listings:', recErr);
       }
@@ -184,7 +180,7 @@ export default function PropertyDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id, user, isGuest, properties]);
+  }, [id, user, isGuest, properties, trackEvent]);
 
   useEffect(() => {
     loadLiveDetails();
@@ -374,7 +370,7 @@ export default function PropertyDetailScreen() {
       } else {
         showToast('Failed to start conversation.');
       }
-    } catch (e) {
+    } catch {
       showToast('Failed to start conversation.');
     }
   };
