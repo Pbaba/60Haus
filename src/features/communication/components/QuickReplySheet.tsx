@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, FlatList } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, FlatList } from 'react-native';
 import { BottomSheet } from '../../../components/BottomSheet';
 import { Theme } from '../../../theme';
 

@@ -1,7 +1,7 @@
 import { useContext, useCallback } from 'react';
 import { PropertyContext } from '../../../context/PropertyContext';
 import { SearchFilters } from '../components/FilterSheet';
-import { savedSearchService } from '../services/savedSearchService';
+import { savedSearchService } from '../../../services/savedSearchService';
 
 export const useFilters = (userId?: string) => {
   const context = useContext(PropertyContext);
@@ -14,7 +14,7 @@ export const useFilters = (userId?: string) => {
   const updateFilters = useCallback(async (newFilters: Partial<SearchFilters>) => {
     const updated = { ...filters, ...newFilters };
     setFilters(updated);
-    await fetchFeed(true); // force refresh with new filters
+    await fetchFeed(); // force refresh with new filters
   }, [filters, setFilters, fetchFeed]);
 
   const clearFilters = useCallback(async () => {
@@ -27,7 +27,7 @@ export const useFilters = (userId?: string) => {
       petFriendly: false,
     };
     setFilters(defaults);
-    await fetchFeed(true);
+    await fetchFeed();
   }, [setFilters, fetchFeed]);
 
   const saveCurrentFilters = useCallback(async (name: string) => {

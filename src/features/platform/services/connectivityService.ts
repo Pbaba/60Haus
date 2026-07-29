@@ -35,7 +35,7 @@ class ConnectivityService {
       }
       
       return isConnected;
-    } catch (e) {
+    } catch {
       return false; // assume offline on error to be safe
     }
   }

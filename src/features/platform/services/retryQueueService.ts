@@ -73,7 +73,7 @@ class RetryQueueService {
       try {
         await handler(action.payload);
         loggingService.info(`Successfully processed queued action: ${action.type}`);
-      } catch (e) {
+      } catch {
         loggingService.warn(`Retry failed for action: ${action.type}`, { retries: action.retries });
         action.retries += 1;
         

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../hooks/useAuth';
-import { Message, Conversation } from '../../../types';
+import { Message } from '../../../types';
 
 interface CommunicationContextType {
   incomingMessage: Message | null;

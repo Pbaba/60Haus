@@ -5,7 +5,7 @@ import { Theme } from '../theme';
 import { Button } from './Button';
 
 interface EmptyStateProps {
-  icon: LucideIcon;
+  icon?: LucideIcon;
   title: string;
   description: string;
   actionLabel?: string;
@@ -27,9 +27,11 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 }) => {
   return (
     <View style={[styles.container, style]}>
-      <View style={styles.iconContainer}>
-        <Icon size={32} color={Theme.colors.primary} />
-      </View>
+      {Icon && (
+        <View style={styles.iconContainer}>
+          <Icon size={32} color={Theme.colors.primary} />
+        </View>
+      )}
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.description}>{description}</Text>
       <View style={styles.actionsContainer}>

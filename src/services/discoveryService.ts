@@ -6,7 +6,6 @@ import { bookmarkService } from './bookmarkService';
 import { historyService } from './historyService';
 
 import { discoveryRankingService } from '../features/discovery/services/discoveryRankingService';
-import { enrichPropertyListing } from '../utils/propertyIntelligence';
 
 export interface DiscoveryStrategyInput {
   filters?: SearchFilters;

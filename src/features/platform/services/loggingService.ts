@@ -1,3 +1,5 @@
+import { betaService } from '../../beta/services/betaService';
+
 export enum LogLevel {
   DEBUG = 0,
   INFO = 1,
@@ -5,7 +7,6 @@ export enum LogLevel {
   ERROR = 3,
 }
 
-import { betaService } from '../../beta/services/betaService';
 
 class LoggingService {
   private level: LogLevel = __DEV__ ? LogLevel.DEBUG : LogLevel.WARN;

@@ -1,7 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, ViewStyle } from 'react-native';
 import { Theme } from '../../../theme';
-import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
 
 interface SearchChipProps {
   label: string;

@@ -23,7 +23,7 @@ export const conversationService = {
 
   async findOrCreateConversation(propertyId: string, ownerId: string, buyerId: string): Promise<Conversation | null> {
     // 1. Try to find existing
-    const { data: existing, error: findError } = await supabase
+    const { data: existing } = await supabase
       .from('conversations')
       .select(`
         *,

@@ -185,7 +185,7 @@ export const propertySearchService = {
 
         // Lifestyle characteristics matching
         if (filters.lifestyleFriendly && filters.lifestyleFriendly.length > 0) {
-          const hasAllTags = filters.lifestyleFriendly.every(tag => 
+          const hasAllTags = filters.lifestyleFriendly.every((tag: string) => 
             snapshot.lifestyleTags.some(t => t.toLowerCase().includes(tag.toLowerCase()))
           );
           if (!hasAllTags) keep = false;

@@ -5,7 +5,7 @@ import { Theme } from '../../../theme';
 import { Button } from '../../../components/Button';
 import { Input } from '../../../components/Input';
 import { CITIES } from '../../../constants';
-import { AMENITIES, AMENITY_CATEGORIES } from '../../../constants/property';
+// Remove unused imports
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
 
 export interface SearchFilters {
@@ -18,6 +18,15 @@ export interface SearchFilters {
   minPrice?: number;
   maxPrice?: number;
   localities?: string[];
+  maxMetroDist?: number;
+  maxHospitalDist?: number;
+  maxSchoolDist?: number;
+  maxParkDist?: number;
+  maxMallDist?: number;
+  lifestyleFriendly?: string[];
+  maxCommuteAirport?: number;
+  maxCommuteMetro?: number;
+  maxCommuteBusiness?: number;
   propertyType?: string | null;
   bathrooms?: number | null;
   propertyAge?: number | null;
@@ -144,11 +153,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
     setMinHealthScore(0);
   };
 
-  const toggleAmenity = (id: string) => {
-    setSelectedAmenities(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
-  };
+
 
   const toggleTrustFilter = (id: string) => {
     setTrustFilters(prev =>

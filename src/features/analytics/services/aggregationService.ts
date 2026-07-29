@@ -1,5 +1,5 @@
 import { supabase } from '../../../lib/supabase';
-import { ListingStatistics, OwnerStatistics, ListingDailyMetric } from '../../../types';
+import { OwnerStatistics, ListingStatistics, ListingDailyMetric } from '../../../types';
 
 export const aggregationService = {
   async getOwnerStatistics(ownerId: string): Promise<OwnerStatistics | null> {

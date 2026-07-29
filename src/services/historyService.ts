@@ -2,6 +2,15 @@ import { supabase } from '../lib/supabase';
 import { PropertyListing } from '../types';
 
 export const historyService = {
+  async recordSearch(userId: string, query: string): Promise<void> {
+    // Stub for search history
+  },
+  async getSearchHistory(userId: string): Promise<string[]> {
+    return [];
+  },
+  async clearSearchHistory(userId: string): Promise<void> {
+    // Stub
+  },
   async recordView(userId: string, propertyId: string): Promise<void> {
     // 1. Upsert viewed timestamp
     const { error } = await supabase

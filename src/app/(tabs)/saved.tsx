@@ -25,7 +25,7 @@ import {
   Bell,
   Search,
   History,
-  ChevronRight,
+
   BookOpen,
 } from 'lucide-react-native';
 import { savedSearchService } from '../../services/savedSearchService';
@@ -54,9 +54,8 @@ export default function SavedScreen() {
 
   // Fallbacks if context is unmounted
   const collections = context?.collections || [];
-  const fetchCollections = context?.fetchCollections || (() => Promise.resolve());
+  const fetchCollections = React.useMemo(() => context?.fetchCollections || (() => Promise.resolve()), [context?.fetchCollections]);
   const createCollection = context?.createCollection || (() => Promise.resolve({} as any));
-  const deleteCollection = context?.deleteCollection || (() => Promise.resolve());
   const setFilters = context?.setFilters || (() => {});
 
   // Load all components data

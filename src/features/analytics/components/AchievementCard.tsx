@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Theme } from '../../../theme';
 import { OwnerAchievement } from '../../../types';
 import { BADGE_DEFINITIONS } from '../services/achievementService';
-import { Award, CheckCircle, Zap, Star } from 'lucide-react-native';
+import { Award, CheckCircle, Zap, Star, ShieldCheck } from 'lucide-react-native';
 
 interface AchievementCardProps {
   achievements: OwnerAchievement[];
@@ -46,8 +46,7 @@ export function AchievementCard({ achievements }: AchievementCardProps) {
   );
 }
 
-// Need to import ShieldCheck for trusted_host
-import { ShieldCheck } from 'lucide-react-native';
+
 
 const styles = StyleSheet.create({
   container: {

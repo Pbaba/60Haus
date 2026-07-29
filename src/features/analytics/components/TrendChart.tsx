@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet, Dimensions, Text } from 'react-native';
 import Svg, { Path, Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
-import Animated, { useSharedValue, useAnimatedProps, withTiming, Easing, interpolate, Extrapolate, SharedValue } from 'react-native-reanimated';
+import Animated, { useAnimatedProps, withTiming, Easing, interpolate, Extrapolate, useSharedValue } from 'react-native-reanimated';
 import { Theme } from '../../../theme';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
@@ -23,20 +23,12 @@ export function TrendChart({ data, height = 150, color = Theme.colors.primary }:
     progress.value = withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.cubic) });
   }, [data, progress]);
 
-  if (!data || data.length === 0) {
-    return (
-      <View style={[styles.container, { height, width, justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={styles.noDataText}>Not enough data to display trend.</Text>
-      </View>
-    );
-  }
-
-  const maxVal = Math.max(...data, 1);
-  const minVal = Math.min(...data, 0);
+  const maxVal = Math.max(...(data || [0]), 1);
+  const minVal = Math.min(...(data || [0]), 0);
 
   // Normalize data points
-  const points = data.map((val, index) => {
-    const x = (index / (data.length - 1)) * width;
+  const points = (data || []).map((val, index) => {
+    const x = (index / ((data || []).length - 1)) * width;
     const y = height - ((val - minVal) / (maxVal - minVal)) * height * 0.8 - height * 0.1; // 10% padding top/bottom
     return { x, y };
   });
@@ -67,6 +59,14 @@ export function TrendChart({ data, height = 150, color = Theme.colors.primary }:
       ),
     };
   });
+
+  if (!data || data.length === 0) {
+    return (
+      <View style={[styles.container, { height, width, justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={styles.noDataText}>Not enough data to display trend.</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { height, width }]}>

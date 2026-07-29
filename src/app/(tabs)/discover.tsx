@@ -17,9 +17,9 @@ import { historyService } from '../../services/historyService';
 
 export default function DiscoverScreen() {
   const router = useRouter();
-  const { filteredProperties, loading } = useProperties();
-  const { filters, updateFilters, clearFilters } = useFilters();
-  const { query, setQuery, performSearch, recentSearches, loadRecentSearches } = useSearch('test-user-id'); // use actual auth user ID here
+  const { filteredProperties } = useProperties();
+  const { filters, updateFilters } = useFilters();
+  const { query, performSearch, loadRecentSearches } = useSearch('test-user-id'); // use actual auth user ID here
   
   const [isMapView, setIsMapView] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
@@ -32,7 +32,7 @@ export default function DiscoverScreen() {
 
   const loadRecentlyViewed = async () => {
     try {
-      const viewed = await historyService.getViewHistory('test-user-id');
+      const viewed = await historyService.getRecentViews('test-user-id');
       setRecentlyViewed(viewed.slice(0, 10)); // Top 10
     } catch (e) {
       console.warn(e);

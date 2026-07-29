@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, View, Text, Dimensions, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { PropertyListing } from '../../../types';
 import { Theme } from '../../../theme';
 import { Image } from 'expo-image';
-import { formatCurrency } from '../../../utils/currency';
+import { formatCurrency } from '../../../utils';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 
@@ -12,7 +12,6 @@ interface MapContainerProps {
   properties: PropertyListing[];
 }
 
-const { width } = Dimensions.get('window');
 
 export const MapContainer: React.FC<MapContainerProps> = ({ properties }) => {
   const router = useRouter();
@@ -129,7 +128,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   map: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   markerContainer: {
     backgroundColor: '#fff',
