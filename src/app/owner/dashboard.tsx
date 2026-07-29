@@ -264,7 +264,7 @@ export default function OwnerDashboardScreen() {
             ))}
           </View>
         ) : (
-          <EmptyState title="No properties found." description="You haven't listed any properties yet." icon="home" actionLabel="Create Listing" onAction={() => router.push('/owner/upload' as any)} />
+          <EmptyState title="No properties found." description="You haven't listed any properties yet." actionLabel="Create Listing" onAction={() => router.push('/owner/upload' as any)} />
         )}
       </ScrollView>
 

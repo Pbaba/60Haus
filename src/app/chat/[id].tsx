@@ -133,6 +133,10 @@ export default function ChatScreen() {
             onVisitAction={handleVisitAction}
           />
         )}
+        initialNumToRender={20}
+        maxToRenderPerBatch={15}
+        windowSize={7}
+        removeClippedSubviews={true}
       />
 
       {/* Input Area */}
