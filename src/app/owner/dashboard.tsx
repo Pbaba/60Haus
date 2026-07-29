@@ -1,33 +1,118 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { useRouter, useNavigation } from 'expo-router';
+import { Image } from 'expo-image';
+import { ArrowLeft, PlusCircle, Eye, Heart, MessageCircle, Calendar } from 'lucide-react-native';
+
 import { ScreenContainer } from '../../components/ScreenContainer';
 import { Card } from '../../components/Card';
-
-import { Image } from 'expo-image';
 import { Button } from '../../components/Button';
 import { FeedbackState } from '../../components/FeedbackState';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
 import { FloatingDock } from '../../components/FloatingDock';
+import { SkeletonDashboard } from '../../components/Skeleton';
+import { EmptyState } from '../../components/EmptyState';
+
 import { APP_TABS } from '../../navigation/tabs';
-import { hapticsService } from '../../services/hapticsService';
+import { Theme } from '../../theme';
+import { formatCurrency } from '../../utils';
+import { PropertyListing } from '../../types';
 
 import { useProfile } from '../../hooks/useProfile';
 import { useProperties } from '../../hooks/useProperties';
 import { propertyService } from '../../services/propertyService';
-import { Theme } from '../../theme';
-import { formatCurrency } from '../../utils';
-import { SkeletonDashboard } from '../../components/Skeleton';
-import { EmptyState } from '../../components/EmptyState';
-import { useHaptics } from '../../hooks/useHaptics';
-import { ArrowLeft, PlusCircle, Eye, Heart, Phone, Trash2, Video } from 'lucide-react-native';
-import { PropertyListing } from '../../types';
-import { localityIntelligence } from '../../domain/location/localityIntelligence';
-import { marketInsights } from '../../domain/location/marketInsights';
+import { hapticsService } from '../../services/hapticsService';
+
+// Analytics Imports
+import { useDashboard, useListingAnalytics } from '../../features/analytics/hooks/useDashboard';
+import { useInsights } from '../../features/analytics/hooks/useInsights';
+import { MetricCard } from '../../features/analytics/components/MetricCard';
+import { TrendChart } from '../../features/analytics/components/TrendChart';
+import { FunnelChart } from '../../features/analytics/components/FunnelChart';
+import { HealthAdvisor } from '../../features/analytics/components/HealthAdvisor';
+import { AchievementCard } from '../../features/analytics/components/AchievementCard';
+import { AudienceInsights } from '../../features/analytics/components/AudienceInsights';
+
+function ListingAnalyticsSection({ propertyId }: { propertyId: string }) {
+  const { loading, stats, funnel, dailyMetrics } = useListingAnalytics(propertyId);
+  const { suggestions } = useInsights(stats);
+
+  if (loading) return null;
+
+  return (
+    <View style={styles.analyticsSection}>
+      <Text style={styles.sectionSubtitle}>Analytics & Conversion</Text>
+      
+      {/* Funnel */}
+      {funnel && (
+        <View style={styles.funnelWrapper}>
+          <FunnelChart data={[
+            { label: 'Views', value: funnel.views, color: Theme.colors.primary },
+            { label: 'Saves', value: funnel.saves, color: '#3b82f6' },
+            { label: 'Msgs', value: funnel.messages, color: '#8b5cf6' },
+            { label: 'Visits', value: funnel.visits, color: '#ec4899' }
+          ]} />
+        </View>
+      )}
+
+      {/* Health Advisor */}
+      {stats && (
+        <HealthAdvisor 
+          score={stats.health_score} 
+          suggestions={suggestions} 
+        />
+      )}
+    </View>
+  );
+}
 
 export default function OwnerDashboardScreen() {
   const router = useRouter();
   const navigation = useNavigation();
+  const { profile } = useProfile();
+  
+  const { deleteListing, archiveListing, restoreListing } = useProperties();
+  const { ownerStats, achievements, loading: analyticsLoading, onRefresh: refreshAnalytics } = useDashboard();
+
+  const [properties, setProperties] = useState<PropertyListing[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
+  const [activeTab, setActiveTab] = useState<'all' | 'published' | 'archived' | 'draft'>('all');
+
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmArchiveId, setConfirmArchiveId] = useState<string | null>(null);
+  const [confirmRestoreId, setConfirmRestoreId] = useState<string | null>(null);
+  const [dialogLoading, setDialogLoading] = useState(false);
+
+  const fetchListings = useCallback(async () => {
+    if (!profile?.id) return;
+    setError(false);
+    try {
+      const data = await propertyService.getOwnerDashboardStats(profile.id);
+      setProperties(data.listings);
+    } catch (e) {
+      console.error('Failed to load listings:', e);
+      setError(true);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    fetchListings();
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchListings();
+    });
+    return unsubscribe;
+  }, [navigation, fetchListings]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    refreshAnalytics();
+    fetchListings();
+  };
 
   const handleTabPress = (key: string) => {
     const tab = APP_TABS.find((t) => t.key === key);
@@ -37,372 +122,47 @@ export default function OwnerDashboardScreen() {
     }
   };
 
-  const { profile } = useProfile();
-  const { deleteListing, archiveListing, restoreListing } = useProperties();
-
-  const [stats, setStats] = useState<{
-    totalListings: number;
-    publishedListings: number;
-    archivedListings: number;
-    totalViews: number;
-    totalSaves: number;
-    totalContacts: number;
-    listings: PropertyListing[];
-  } | null>(null);
-
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState(false);
-  const [activeTab, setActiveTab] = useState<'all' | 'published' | 'archived' | 'draft'>('all');
-
-  // Deletion / Archiving confirmation dialog states
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [confirmArchiveId, setConfirmArchiveId] = useState<string | null>(null);
-  const [confirmRestoreId, setConfirmRestoreId] = useState<string | null>(null);
-  const [dialogLoading, setDialogLoading] = useState(false);
-  const haptics = useHaptics();
-
-  const fetchDashboardStats = useCallback(async () => {
-    if (!profile?.id) return;
-    setError(false);
-    try {
-      const data = await propertyService.getOwnerDashboardStats(profile.id);
-      setStats(data);
-    } catch (e) {
-      console.error('Failed to load dashboard metrics:', e);
-      setError(true);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [profile]);
-
-  useEffect(() => {
-    fetchDashboardStats();
-    
-    // Refresh stats when the screen gains focus
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchDashboardStats();
-    });
-    return unsubscribe;
-  }, [navigation, fetchDashboardStats]);
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchDashboardStats();
-  };
-
-  // Perform listing deletion with atomic rollback safety
-  const handleDeleteConfirm = async () => {
-    if (!confirmDeleteId) return;
+  const handleListingAction = async (action: 'delete' | 'archive' | 'restore', id: string) => {
     setDialogLoading(true);
     try {
-      await deleteListing(confirmDeleteId);
+      if (action === 'delete') await deleteListing(id);
+      if (action === 'archive') await archiveListing(id);
+      if (action === 'restore') await restoreListing(id);
+      
       setConfirmDeleteId(null);
-      await fetchDashboardStats();
-    } catch (e: any) {
-      alert(e.message || 'Deletion failed. Please try again.');
-    } finally {
-      setDialogLoading(false);
-    }
-  };
-
-  const handleArchiveConfirm = async () => {
-    if (!confirmArchiveId) return;
-    setDialogLoading(true);
-    try {
-      await archiveListing(confirmArchiveId);
       setConfirmArchiveId(null);
-      await fetchDashboardStats();
-    } catch (e: any) {
-      alert(e.message || 'Archiving failed. Please try again.');
-    } finally {
-      setDialogLoading(false);
-    }
-  };
-
-  const handleRestoreConfirm = async () => {
-    if (!confirmRestoreId) return;
-    setDialogLoading(true);
-    try {
-      await restoreListing(confirmRestoreId);
       setConfirmRestoreId(null);
-      await fetchDashboardStats();
+      await fetchListings();
     } catch (e: any) {
-      alert(e.message || 'Restoring failed. Please try again.');
+      alert(`${action} failed. Please try again.`);
     } finally {
       setDialogLoading(false);
     }
   };
 
-  const renderListingItem = (item: PropertyListing) => {
-    const isDraft = item.status === 'draft';
-    const isArchived = item.status === 'archived';
-    
-    return (
-      <Card key={item.id} style={styles.listingCard}>
-        <View style={styles.listingContent}>
-          <Image
-            source={{ uri: item.thumbnailUrl }}
-            style={styles.thumbnail}
-            contentFit="cover"
-          />
-          <View style={styles.listingInfo}>
-            <View style={styles.statusRow}>
-              <Text style={styles.listingPrice}>
-                {formatCurrency(item.price)}
-                {item.listingType === 'rent' && <Text style={{ fontSize: 10, color: Theme.colors.textSecondary }}>/mo</Text>}
-              </Text>
-              <View
-                style={[
-                  styles.badge,
-                  isDraft && styles.draftBadge,
-                  isArchived && styles.archivedBadge,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.badgeText,
-                    isDraft && styles.draftBadgeText,
-                    isArchived && styles.archivedBadgeText,
-                  ]}
-                >
-                  {item.status || 'Published'}
-                </Text>
-              </View>
-            </View>
-
-            <Text style={styles.listingTitle} numberOfLines={1}>
-              {item.title}
-            </Text>
-            <Text style={styles.listingCity}>{item.locality ? `${item.locality}, ${item.city}` : item.city}</Text>
-            
-            <View style={styles.analyticsRow}>
-              <View style={styles.statMini}>
-                <Eye size={12} color={Theme.colors.textSecondary} />
-                <Text style={styles.statMiniText}>{item.viewCount || 0}</Text>
-              </View>
-              <View style={styles.statMini}>
-                <Heart size={12} color={Theme.colors.textSecondary} />
-                <Text style={styles.statMiniText}>{item.saveCount || 0}</Text>
-              </View>
-              <View style={styles.statMini}>
-                <Phone size={12} color={Theme.colors.textSecondary} />
-                <Text style={styles.statMiniText}>{item.contactCount || 0}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Marketplace Positioning Insights */}
-        {(() => {
-          const allItems = stats?.listings || [];
-          const metrics = item.locality 
-            ? localityIntelligence.calculateLocalityMetrics(allItems, item.locality)
-            : null;
-          const insights = metrics 
-            ? marketInsights.calculateMarketInsights(item, metrics, allItems)
-            : null;
-
-          if (!insights) return null;
-          return (
-            <View style={styles.positioningContainer}>
-              <Text style={styles.positioningTitle}>Locality Market Positioning</Text>
-              <View style={styles.positioningGrid}>
-                <View style={styles.posCell}>
-                  <Text style={styles.posLabel}>Pricing vs Locality</Text>
-                  <Text style={[
-                    styles.posValue,
-                    insights.priceVsLocalityAveragePct <= 0 ? { color: Theme.colors.success } : { color: Theme.colors.danger }
-                  ]}>
-                    {insights.priceVsLocalityAveragePct <= 0 
-                      ? `${Math.abs(insights.priceVsLocalityAveragePct)}% below` 
-                      : `${insights.priceVsLocalityAveragePct}% above`}
-                  </Text>
-                </View>
-                <View style={styles.posCell}>
-                  <Text style={styles.posLabel}>Size vs Area Avg</Text>
-                  <Text style={styles.posValue}>
-                    {insights.sizeVsLocalityAveragePct >= 0 
-                      ? `${insights.sizeVsLocalityAveragePct}% larger` 
-                      : `${Math.abs(insights.sizeVsLocalityAveragePct)}% smaller`}
-                  </Text>
-                </View>
-                <View style={styles.posCell}>
-                  <Text style={styles.posLabel}>Listing Rank</Text>
-                  <Text style={[styles.posValue, { color: Theme.colors.primary }]}>
-                    Top {insights.qualityPercentile}%
-                  </Text>
-                </View>
-              </View>
-            </View>
-          );
-        })()}
-
-        {/* Listing Health Scorecard & Suggestions */}
-        <View style={styles.healthContainer}>
-          <View style={styles.healthHeader}>
-            <Text style={styles.healthLabel}>Listing Quality Health</Text>
-            <Text style={[
-              styles.healthScoreValue,
-              (item.healthScore || 0) > 80 ? styles.healthGood : (item.healthScore || 0) > 50 ? styles.healthMedium : styles.healthPoor
-            ]}>
-              {item.healthScore || 0}%
-            </Text>
-          </View>
-          <View style={styles.healthBarBg}>
-            <View style={[
-              styles.healthBarFill,
-              { width: `${item.healthScore || 0}%` },
-              (item.healthScore || 0) > 80 ? { backgroundColor: Theme.colors.success } : (item.healthScore || 0) > 50 ? { backgroundColor: '#DD6B20' } : { backgroundColor: Theme.colors.danger }
-            ]} />
-          </View>
-          {item.healthSuggestions && item.healthSuggestions.length > 0 && (
-            <View style={styles.suggestionsList}>
-              <Text style={styles.suggestionsTitle}>Improvement suggestions:</Text>
-              {item.healthSuggestions.slice(0, 2).map((sug, idx) => (
-                <Text key={idx} style={styles.suggestionItem}>
-                  • {sug.text} <Text style={styles.boostText}>(+{sug.boost}% views)</Text>
-                </Text>
-              ))}
-            </View>
-          )}
-        </View>
-
-        {/* Marketplace Integrity & Verification */}
-        <View style={styles.verificationContainer}>
-          <Text style={styles.verificationTitle}>Marketplace Health</Text>
-          
-          <View style={styles.verificationRow}>
-            <View style={styles.verificationInfo}>
-              <Text style={styles.verificationLabel}>
-                {item.healthStatus === 'excellent' ? 'Excellent Health' :
-                 item.healthStatus === 'good' ? 'Good Health' :
-                 item.healthStatus === 'needs_attention' ? 'Needs Attention' : 
-                 item.healthStatus === 'poor' ? 'Poor Health' : 'Health Score Pending'}
-              </Text>
-              {item.healthBreakdown && Object.keys(item.healthBreakdown).length > 0 && (
-                <Text style={styles.verificationDate}>
-                  {Object.values(item.healthBreakdown)[0] as string}
-                </Text>
-              )}
-            </View>
-          </View>
-
-          <View style={[styles.verificationRow, { marginTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', paddingTop: 12 }]}>
-            <View style={styles.verificationInfo}>
-              <Text style={styles.verificationLabel}>
-                {item.verificationStatus === 'inactive_unverified' ? 'Deactivated (Unverified)' : 
-                 item.verificationStatus === 'awaiting_verification' ? 'Verification Due' :
-                 item.verificationStatus === 'grace_period' ? 'Verification Overdue' : 'Active'}
-              </Text>
-              <Text style={styles.verificationDate}>
-                {item.lastVerifiedAt 
-                  ? `Last verified: ${new Date(item.lastVerifiedAt).toLocaleDateString()}` 
-                  : 'Not verified yet'}
-              </Text>
-            </View>
-            
-            {item.verificationStatus === 'inactive_unverified' && (
-              <Button
-                variant="primary"
-                style={styles.reactivateBtn}
-                onPress={async () => {
-                  setDialogLoading(true);
-                  try {
-                    await propertyService.submitVerification(item.id, profile!.id, 'verified_available', item.nextVerificationAt || new Date().toISOString());
-                    haptics.success();
-                    await fetchDashboardStats();
-                  } catch (e: any) {
-                    alert('Failed to reactivate: ' + e.message);
-                  } finally {
-                    setDialogLoading(false);
-                  }
-                }}
-              >
-                Reactivate
-              </Button>
-            )}
-          </View>
-        </View>
-
-        {/* Action Controls */}
-        <View style={styles.actionButtons}>
-          <Button
-            variant="secondary"
-            style={styles.actionBtn}
-            onPress={() => router.push(`/property/${item.id}` as any)}
-          >
-            View
-          </Button>
-
-          <Button
-            variant="secondary"
-            style={styles.actionBtn}
-            onPress={() => router.push(`/owner/upload?id=${item.id}` as any)}
-          >
-            Edit
-          </Button>
-
-          {isArchived ? (
-            <Button
-              variant="secondary"
-              style={styles.actionBtn}
-              onPress={() => setConfirmRestoreId(item.id)}
-            >
-              Restore
-            </Button>
-          ) : (
-            <Button
-              variant="secondary"
-              style={styles.actionBtn}
-              onPress={() => setConfirmArchiveId(item.id)}
-              disabled={isDraft}
-            >
-              Archive
-            </Button>
-          )}
-
-          <TouchableOpacity
-            style={styles.deleteBtn}
-            onPress={() => setConfirmDeleteId(item.id)}
-          >
-            <Trash2 size={16} color={Theme.colors.danger} />
-          </TouchableOpacity>
-        </View>
-      </Card>
-    );
-  };
-
-  if (loading) {
+  if (loading || analyticsLoading) {
     return (
       <ScreenContainer style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.replace('/(tabs)/profile' as any)}>
             <ArrowLeft size={24} color={Theme.colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.title}>Host Dashboard</Text>
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => router.push('/owner/upload' as any)}
-          >
-            <PlusCircle size={24} color={Theme.colors.primary} />
-          </TouchableOpacity>
+          <Text style={styles.title}>Performance</Text>
         </View>
         <SkeletonDashboard />
       </ScreenContainer>
     );
   }
 
-  if (error || !stats) {
+  if (error) {
     return (
       <ScreenContainer style={styles.center}>
-        <FeedbackState type="error" onRetry={fetchDashboardStats} />
+        <FeedbackState type="error" onRetry={fetchListings} />
       </ScreenContainer>
     );
   }
 
-  const filteredListings = stats.listings.filter((item) => {
+  const filteredListings = properties.filter((item) => {
     if (activeTab === 'published') return item.status === 'published' || !item.status;
     if (activeTab === 'archived') return item.status === 'archived';
     if (activeTab === 'draft') return item.status === 'draft';
@@ -411,16 +171,12 @@ export default function OwnerDashboardScreen() {
 
   return (
     <ScreenContainer style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.replace('/(tabs)/profile' as any)}>
           <ArrowLeft size={24} color={Theme.colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.title}>Host Dashboard</Text>
-        <TouchableOpacity
-          style={styles.addBtn}
-          onPress={() => router.push('/owner/upload' as any)}
-        >
+        <Text style={styles.title}>Performance Console</Text>
+        <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/owner/upload' as any)}>
           <PlusCircle size={24} color={Theme.colors.primary} />
         </TouchableOpacity>
       </View>
@@ -428,50 +184,38 @@ export default function OwnerDashboardScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Theme.colors.primary} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Theme.colors.primary} />}
       >
-        {/* KPI Panel */}
-        <View style={styles.kpiContainer}>
-          <Card style={styles.kpiCard}>
-            <Text style={styles.kpiVal}>{stats.totalViews}</Text>
-            <Text style={styles.kpiLabel}>Views</Text>
-          </Card>
-          <Card style={styles.kpiCard}>
-            <Text style={styles.kpiVal}>{stats.totalSaves}</Text>
-            <Text style={styles.kpiLabel}>Saves</Text>
-          </Card>
-          <Card style={styles.kpiCard}>
-            <Text style={styles.kpiVal}>{stats.totalContacts}</Text>
-            <Text style={styles.kpiLabel}>Contacts</Text>
-          </Card>
-          <Card style={styles.kpiCard}>
-            <Text style={styles.kpiVal}>{stats.listings.filter((l) => l.status === 'published' || !l.status).length}</Text>
-            <Text style={styles.kpiLabel}>Published</Text>
-          </Card>
-          <Card style={styles.kpiCard}>
-            <Text style={styles.kpiVal}>{stats.listings.filter((l) => l.status === 'published' || !l.status).length}</Text>
-            <Text style={styles.kpiLabel}>Active Listings</Text>
-          </Card>
-          <Card style={styles.kpiCard}>
-            <Text style={styles.kpiVal}>{stats.listings.filter((l) => l.status === 'archived').length}</Text>
-            <Text style={styles.kpiLabel}>Archived</Text>
-          </Card>
-          <Card style={styles.kpiCard}>
-            <Text style={styles.kpiVal}>{stats.listings.filter((l) => l.status === 'draft').length}</Text>
-            <Text style={styles.kpiLabel}>Drafts</Text>
-          </Card>
-        </View>
+        {/* Marketplace Insights (Overall) */}
+        {ownerStats && (
+          <View style={styles.overviewSection}>
+            <View style={styles.metricsGrid}>
+              <MetricCard title="Total Views" value={ownerStats.total_views} icon={Eye} trend={12} highlight />
+              <MetricCard title="Total Saves" value={ownerStats.total_saves} icon={Heart} trend={5} />
+              <MetricCard title="Leads Generated" value={ownerStats.total_leads} icon={MessageCircle} />
+              <MetricCard title="Avg Response" value={`${ownerStats.avg_response_time_minutes}m`} icon={Calendar} trend={-15} trendLabel="Faster than avg" />
+            </View>
 
-        {/* Tab Filters */}
+            <View style={styles.chartWrapper}>
+              <Text style={styles.sectionSubtitle}>Audience Trend (Last 30 Days)</Text>
+              {/* Using dummy trend data for the global level until backend aggregations are complete */}
+              <TrendChart data={[10, 25, 18, 40, 60, 45, 80, 95, 110, 85, 130, 160]} height={140} color={Theme.colors.primary} />
+            </View>
+
+            <AudienceInsights />
+
+            <AchievementCard achievements={achievements} />
+          </View>
+        )}
+
+        {/* Listing Filters */}
         <View style={styles.tabsRow}>
           {(['all', 'published', 'archived', 'draft'] as const).map((tab) => {
             const isActive = activeTab === tab;
-            let count = stats.totalListings;
-            if (tab === 'published') count = stats.publishedListings;
-            if (tab === 'archived') count = stats.archivedListings;
-            if (tab === 'draft') count = stats.listings.filter((l) => l.status === 'draft').length;
+            let count = properties.length;
+            if (tab === 'published') count = properties.filter(l => l.status === 'published' || !l.status).length;
+            if (tab === 'archived') count = properties.filter(l => l.status === 'archived').length;
+            if (tab === 'draft') count = properties.filter(l => l.status === 'draft').length;
 
             return (
               <TouchableOpacity
@@ -490,406 +234,106 @@ export default function OwnerDashboardScreen() {
         {/* Listings Display */}
         {filteredListings.length > 0 ? (
           <View style={styles.listingsList}>
-            {filteredListings.map(renderListingItem)}
+            {filteredListings.map(item => (
+              <Card key={item.id} style={styles.listingCard}>
+                <View style={styles.listingHeader}>
+                  <Image source={{ uri: item.thumbnailUrl }} style={styles.thumbnail} contentFit="cover" />
+                  <View style={styles.listingInfo}>
+                    <Text style={styles.listingTitle} numberOfLines={1}>{item.title}</Text>
+                    <Text style={styles.listingCity}>{item.locality || item.city}</Text>
+                    <Text style={styles.listingPrice}>{formatCurrency(item.price)}</Text>
+                  </View>
+                </View>
+
+                {/* Listing Specific Analytics */}
+                <ListingAnalyticsSection propertyId={item.id} />
+
+                {/* Actions */}
+                <View style={styles.actionButtons}>
+                  <Button variant="secondary" style={styles.actionBtn} onPress={() => router.push(`/owner/upload?id=${item.id}` as any)}>
+                    Edit
+                  </Button>
+                  {item.status === 'archived' ? (
+                    <Button variant="secondary" style={styles.actionBtn} onPress={() => setConfirmRestoreId(item.id)}>Restore</Button>
+                  ) : (
+                    <Button variant="secondary" style={styles.actionBtn} onPress={() => setConfirmArchiveId(item.id)} disabled={item.status === 'draft'}>Archive</Button>
+                  )}
+                  <Button variant="secondary" style={[styles.actionBtn, styles.deleteBtn]} onPress={() => setConfirmDeleteId(item.id)}>Delete</Button>
+                </View>
+              </Card>
+            ))}
           </View>
         ) : (
-          <View style={styles.emptyContainer}>
-            <EmptyState
-              icon={Video}
-              title="Publish your first property."
-              description="List walkthrough videos and get direct leads today."
-              onAction={() => router.push('/owner/upload' as any)}
-              actionLabel="Create Listing"
-            />
-          </View>
+          <EmptyState title="No properties found." description="You haven't listed any properties yet." icon="home" actionLabel="Create Listing" onAction={() => router.push('/owner/upload' as any)} />
         )}
       </ScrollView>
 
-      {/* Confirmation Modals */}
+      {/* Dialogs */}
       <ConfirmationDialog
         visible={!!confirmDeleteId}
-        title="Delete Property Tour?"
-        message="This will permanently delete the walkthrough listing record and erase all media assets from Supabase Storage. This action is irreversible."
+        title="Delete Property?"
+        message="This is irreversible."
         confirmText={dialogLoading ? "Deleting..." : "Delete"}
         cancelText="Cancel"
         destructive
-        onConfirm={handleDeleteConfirm}
+        onConfirm={() => handleListingAction('delete', confirmDeleteId!)}
         onCancel={() => !dialogLoading && setConfirmDeleteId(null)}
       />
-
       <ConfirmationDialog
         visible={!!confirmArchiveId}
-        title="Archive Property Listing?"
-        message="This listing will be hidden from the feed and search search options immediately. You can restore it anytime."
+        title="Archive Property?"
+        message="It will be hidden from the public feed."
         confirmText={dialogLoading ? "Archiving..." : "Archive"}
         cancelText="Cancel"
-        onConfirm={handleArchiveConfirm}
+        onConfirm={() => handleListingAction('archive', confirmArchiveId!)}
         onCancel={() => !dialogLoading && setConfirmArchiveId(null)}
       />
-
       <ConfirmationDialog
         visible={!!confirmRestoreId}
-        title="Restore Property Listing?"
-        message="This listing will be made live and visible again on the Feed and search indexes."
+        title="Restore Property?"
+        message="It will be visible on the public feed."
         confirmText={dialogLoading ? "Restoring..." : "Restore"}
         cancelText="Cancel"
-        onConfirm={handleRestoreConfirm}
+        onConfirm={() => handleListingAction('restore', confirmRestoreId!)}
         onCancel={() => !dialogLoading && setConfirmRestoreId(null)}
       />
 
-      <FloatingDock
-        tabs={APP_TABS}
-        activeTab="owner-dashboard"
-        onTabPress={handleTabPress}
-      />
+      <FloatingDock tabs={APP_TABS} activeTab="owner-dashboard" onTabPress={handleTabPress} />
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Theme.colors.background,
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Theme.spacing.md,
-  },
-  loadingText: {
-    fontSize: Theme.typography.sizes.sm,
-    color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
-  },
+  container: { flex: 1, backgroundColor: Theme.colors.background },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Theme.spacing.xl,
-    paddingTop: Theme.spacing.md,
-    paddingBottom: Theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Theme.colors.border,
-    gap: Theme.spacing.md,
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: Theme.spacing.xl, 
+    paddingVertical: Theme.spacing.md, borderBottomWidth: 1, borderBottomColor: Theme.colors.border
   },
-  backBtn: {
-    padding: Theme.spacing.xs,
-  },
-  title: {
-    fontSize: Theme.typography.sizes.md,
-    color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamilyBold,
-    flex: 1,
-  },
-  addBtn: {
-    padding: Theme.spacing.xs,
-  },
-  scrollContent: {
-    paddingBottom: Theme.floatingDock.height + Theme.spacing.xxxl * 2,
-    paddingHorizontal: Theme.spacing.xl,
-    paddingTop: Theme.spacing.lg,
-    gap: Theme.spacing.lg,
-  },
-  kpiContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Theme.spacing.md,
-    marginBottom: Theme.spacing.md,
-  },
-  kpiCard: {
-    width: '47%',
-    backgroundColor: Theme.colors.surface,
-    padding: Theme.spacing.md,
-    borderRadius: Theme.borderRadius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: Theme.colors.border,
-  },
-  kpiVal: {
-    fontSize: Theme.typography.sizes.h3,
-    color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamilyBold,
-  },
-  kpiLabel: {
-    fontSize: Theme.typography.sizes.xs,
-    color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
-    textTransform: 'uppercase',
-  },
-  tabsRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: Theme.colors.border,
-    paddingBottom: Theme.spacing.xs,
-    gap: Theme.spacing.sm,
-  },
-  tabBtn: {
-    paddingVertical: Theme.spacing.sm,
-    paddingHorizontal: Theme.spacing.xs,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabBtnActive: {
-    borderBottomColor: Theme.colors.primary,
-  },
-  tabText: {
-    fontSize: Theme.typography.sizes.xs,
-    color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
-    textTransform: 'capitalize',
-  },
-  tabTextActive: {
-    color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamilyBold,
-  },
-  listingsList: {
-    gap: Theme.spacing.md,
-  },
-  listingCard: {
-    backgroundColor: Theme.colors.surface,
-    borderColor: Theme.colors.border,
-    borderWidth: 1,
-    borderRadius: Theme.borderRadius.md,
-    padding: Theme.spacing.md,
-    gap: Theme.spacing.md,
-  },
-  listingContent: {
-    flexDirection: 'row',
-    gap: Theme.spacing.md,
-  },
-  thumbnail: {
-    width: 80,
-    height: 80,
-    borderRadius: Theme.borderRadius.sm,
-    backgroundColor: Theme.colors.backgroundSecondary,
-  },
-  listingInfo: {
-    flex: 1,
-    gap: 4,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  listingPrice: {
-    fontSize: Theme.typography.sizes.md,
-    color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamilyBold,
-  },
-  badge: {
-    backgroundColor: Theme.colors.primary + '15',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: Theme.borderRadius.xs,
-  },
-  badgeText: {
-    fontSize: Theme.typography.sizes.xxs,
-    color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamilyBold,
-    textTransform: 'capitalize',
-  },
-  draftBadge: {
-    backgroundColor: '#3b82f615',
-  },
-  draftBadgeText: {
-    color: '#3b82f6',
-  },
-  archivedBadge: {
-    backgroundColor: '#eab30815',
-  },
-  archivedBadgeText: {
-    color: '#eab308',
-  },
-  listingTitle: {
-    fontSize: Theme.typography.sizes.sm,
-    color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamilyEditorialBold,
-  },
-  listingCity: {
-    fontSize: Theme.typography.sizes.xs,
-    color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
-  },
-  analyticsRow: {
-    flexDirection: 'row',
-    gap: Theme.spacing.md,
-    marginTop: 4,
-  },
-  statMini: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statMiniText: {
-    fontSize: Theme.typography.sizes.xs,
-    color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: Theme.spacing.sm,
-    alignItems: 'center',
-  },
-  actionBtn: {
-    flex: 1,
-    height: 32,
-    paddingVertical: 0,
-  },
-  deleteBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: Theme.borderRadius.sm,
-    borderColor: Theme.colors.border,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Theme.colors.surface,
-  },
-  emptyContainer: {
-    paddingVertical: Theme.spacing.xxxl,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-  },
-  healthContainer: {
-    padding: Theme.spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Theme.colors.border,
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-    marginVertical: Theme.spacing.xs,
-    gap: 4,
-    borderRadius: Theme.borderRadius.sm,
-  },
-  healthHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  healthLabel: {
-    fontSize: Theme.typography.sizes.sm,
-    color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamilySemiBold,
-  },
-  healthScoreValue: {
-    fontSize: 13,
-    fontFamily: Theme.typography.fontFamilyBold,
-  },
-  healthGood: {
-    color: Theme.colors.success,
-  },
-  healthMedium: {
-    color: '#DFB978',
-  },
-  healthPoor: {
-    color: Theme.colors.danger,
-  },
-  healthBarBg: {
-    height: 6,
-    backgroundColor: Theme.colors.border,
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginVertical: 4,
-  },
-  healthBarFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  suggestionsList: {
-    marginTop: 4,
-    gap: 2,
-  },
-  suggestionsTitle: {
-    fontSize: Theme.typography.sizes.xs,
-    color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamilyBold,
-    textTransform: 'uppercase',
-    letterSpacing: Theme.typography.letterSpacing.wide,
-  },
-  suggestionItem: {
-    fontSize: 11,
-    color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamily,
-  },
-  boostText: {
-    color: Theme.colors.primary,
-    fontFamily: Theme.typography.fontFamilyBold,
-  },
-  positioningContainer: {
-    padding: Theme.spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Theme.colors.border,
-    backgroundColor: 'rgba(255, 255, 255, 0.01)',
-    gap: 4,
-    borderRadius: Theme.borderRadius.sm,
-  },
-  positioningTitle: {
-    fontSize: Theme.typography.sizes.xs,
-    color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamilyBold,
-    textTransform: 'uppercase',
-    letterSpacing: Theme.typography.letterSpacing.wide,
-  },
-  positioningGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  posCell: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  posLabel: {
-    fontSize: Theme.typography.sizes.xxs,
-    color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
-  },
-  posValue: {
-    fontSize: 11,
-    fontFamily: Theme.typography.fontFamilyBold,
-    marginTop: 2,
-    color: Theme.colors.textPrimary,
-  },
-  verificationContainer: {
-    padding: Theme.spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Theme.colors.border,
-    backgroundColor: 'rgba(255, 255, 255, 0.01)',
-    gap: 4,
-    borderRadius: Theme.borderRadius.sm,
-  },
-  verificationTitle: {
-    fontSize: Theme.typography.sizes.xs,
-    color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamilyBold,
-    textTransform: 'uppercase',
-    letterSpacing: Theme.typography.letterSpacing.wide,
-  },
-  verificationRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  verificationInfo: {
-    flex: 1,
-  },
-  verificationLabel: {
-    fontSize: Theme.typography.sizes.sm,
-    color: Theme.colors.textPrimary,
-    fontFamily: Theme.typography.fontFamilySemiBold,
-  },
-  verificationDate: {
-    fontSize: 11,
-    color: Theme.colors.textSecondary,
-    fontFamily: Theme.typography.fontFamily,
-    marginTop: 2,
-  },
-  reactivateBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    height: 'auto',
-  },
+  backBtn: { padding: Theme.spacing.xs, marginRight: Theme.spacing.md },
+  addBtn: { padding: Theme.spacing.xs },
+  title: { fontSize: Theme.typography.sizes.md, fontFamily: Theme.typography.fontFamilyBold, flex: 1, color: Theme.colors.textPrimary },
+  scrollContent: { paddingBottom: 120, paddingHorizontal: Theme.spacing.xl, paddingTop: Theme.spacing.lg },
+  overviewSection: { gap: Theme.spacing.lg, marginBottom: Theme.spacing.xl },
+  metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Theme.spacing.md },
+  chartWrapper: { backgroundColor: Theme.colors.surface, padding: Theme.spacing.md, borderRadius: Theme.borderRadius.md, borderWidth: 1, borderColor: Theme.colors.border },
+  sectionSubtitle: { fontSize: Theme.typography.sizes.sm, fontFamily: Theme.typography.fontFamilyBold, color: Theme.colors.textPrimary, marginBottom: Theme.spacing.sm },
+  tabsRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Theme.colors.border, marginBottom: Theme.spacing.md },
+  tabBtn: { paddingVertical: Theme.spacing.sm, paddingHorizontal: Theme.spacing.md, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabBtnActive: { borderBottomColor: Theme.colors.primary },
+  tabText: { fontSize: Theme.typography.sizes.xs, color: Theme.colors.textSecondary, fontFamily: Theme.typography.fontFamily, textTransform: 'capitalize' },
+  tabTextActive: { color: Theme.colors.primary, fontFamily: Theme.typography.fontFamilyBold },
+  listingsList: { gap: Theme.spacing.lg },
+  listingCard: { backgroundColor: Theme.colors.surface, borderWidth: 1, borderColor: Theme.colors.border, borderRadius: Theme.borderRadius.md, padding: Theme.spacing.md, gap: Theme.spacing.md },
+  listingHeader: { flexDirection: 'row', gap: Theme.spacing.md },
+  thumbnail: { width: 80, height: 80, borderRadius: Theme.borderRadius.sm, backgroundColor: Theme.colors.backgroundSecondary },
+  listingInfo: { flex: 1, gap: 4, justifyContent: 'center' },
+  listingTitle: { fontSize: Theme.typography.sizes.sm, color: Theme.colors.textPrimary, fontFamily: Theme.typography.fontFamilyBold },
+  listingCity: { fontSize: Theme.typography.sizes.xs, color: Theme.colors.textSecondary, fontFamily: Theme.typography.fontFamily },
+  listingPrice: { fontSize: Theme.typography.sizes.sm, color: Theme.colors.primary, fontFamily: Theme.typography.fontFamilyBold },
+  analyticsSection: { backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: Theme.borderRadius.sm, padding: Theme.spacing.md },
+  funnelWrapper: { marginTop: Theme.spacing.sm },
+  actionButtons: { flexDirection: 'row', gap: Theme.spacing.sm },
+  actionBtn: { flex: 1, height: 36, paddingVertical: 0 },
+  deleteBtn: { borderColor: Theme.colors.danger, color: Theme.colors.danger }
 });

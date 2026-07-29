@@ -39,7 +39,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           </Button>
         )}
         {secondaryActionLabel && onSecondaryAction && (
-          <Button variant="outline" style={styles.secondaryActionBtn} onPress={onSecondaryAction}>
+          <Button variant="secondary" style={styles.secondaryActionBtn} onPress={onSecondaryAction}>
             {secondaryActionLabel}
           </Button>
         )}
