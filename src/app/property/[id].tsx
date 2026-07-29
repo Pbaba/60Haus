@@ -20,6 +20,9 @@ import { profileService } from '../../services/profileService';
 import { discoveryService } from '../../services/discoveryService';
 import { historyService } from '../../services/historyService';
 import { supabase } from '../../lib/supabase';
+import { conversationService } from '../../features/communication/services/conversationService';
+import { notificationService } from '../../services/notificationService';
+import { useAnalytics } from '../../features/analytics/hooks/useAnalytics';
 import { Theme } from '../../theme';
 import { formatCurrency } from '../../utils';
 import { ArrowLeft, MapPin, Heart, Share2, Phone, GitCompare, ShieldAlert } from 'lucide-react-native';
@@ -31,7 +34,6 @@ import {
   PropertyActivityLog,
   ListingQualityReport,
 } from '../../types';
-import { analyticsService } from '../../services/analyticsService';
 import { trustService, MarketContextModel } from '../../services/trustService';
 
 export default function PropertyDetailScreen() {
@@ -50,6 +52,7 @@ export default function PropertyDetailScreen() {
   } = useProperties();
   const { user, isGuest } = useAuth();
   const { showToast } = useFeedback();
+  const { trackEvent } = useAnalytics();
 
   const [property, setProperty] = useState<PropertyListing | null>(null);
   const [ownerProfile, setOwnerProfile] = useState<UserProfile | null>(null);
@@ -151,6 +154,7 @@ export default function PropertyDetailScreen() {
       // 4. Log property history view record
       if (user && !isGuest) {
         await historyService.recordView(user.id, prop.id);
+        trackEvent('property_viewed', prop.id, prop.owner_id);
       }
 
       // 5. Load Sprint 16 verification, history timeline, and pricing context
@@ -201,6 +205,7 @@ export default function PropertyDetailScreen() {
         url: `https://60haus.app/property/${property.id}`,
       });
       analyticsService.trackScreenView('property_detail');
+      trackEvent('property_shared', property.id, property.ownerId);
     } catch {
       console.warn('Share failed');
     }
@@ -267,6 +272,9 @@ export default function PropertyDetailScreen() {
       // Opt-in save properties globally to retain bookmarks sync
       if (!isSaved) {
         toggleSave(id);
+        if (property) {
+          trackEvent('property_saved', id, property.ownerId);
+        }
       }
 
       if (creatingNewCollection) {
@@ -330,9 +338,16 @@ export default function PropertyDetailScreen() {
     }
   };
 
-  const handleContact = () => {
-    if (!ownerProfile?.phoneNumber) {
-      Alert.alert('Contact Details', 'No contact phone number provided by the homeowner.');
+  const handleContact = async () => {
+    if (isGuest || !user) {
+      Alert.alert(
+        'Authentication Required',
+        'Please sign in to contact the property owner.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => router.push('/login' as any) },
+        ]
+      );
       return;
     }
 
@@ -340,24 +355,28 @@ export default function PropertyDetailScreen() {
       incrementContactCount(id);
     }
 
-    Alert.alert(
-      'Contact Owner',
-      `Reach out to ${ownerProfile.fullName || 'Homeowner'}:`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Call Phone',
-          onPress: () => Linking.openURL(`tel:${ownerProfile.phoneNumber}`),
-        },
-        {
-          text: 'Send WhatsApp',
-          onPress: () => {
-            const formatted = ownerProfile.phoneNumber!.replace(/[^0-9]/g, '');
-            Linking.openURL(`https://wa.me/${formatted}`);
-          },
-        },
-      ]
-    );
+    if (!property) return;
+
+    try {
+      const conv = await conversationService.findOrCreateConversation(property.id, property.ownerId, user.id);
+      if (conv) {
+        // Optimistically notify owner
+        if (ownerProfile?.push_token) {
+          notificationService.sendPushNotification(
+            ownerProfile.push_token,
+            'New Inquiry',
+            `${user.email || 'Someone'} is interested in ${property.title}.`,
+            { url: `/chat/${conv.id}` }
+          );
+        }
+        trackEvent('conversation_started', property.id, property.ownerId);
+        router.push(`/chat/${conv.id}` as any);
+      } else {
+        showToast('Failed to start conversation.');
+      }
+    } catch (e) {
+      showToast('Failed to start conversation.');
+    }
   };
 
   const renderSkeletons = () => (

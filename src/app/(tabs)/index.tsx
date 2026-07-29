@@ -494,18 +494,13 @@ export default function FeedScreen() {
             />
           }
         />
+      ) : (
         <EmptyState
           icon={Home}
           title="No properties available"
           description="We couldn't find any listings matching your search. Try adjusting your filters or check back later."
           actionLabel="Edit Filters"
           onAction={() => router.push('/(tabs)/discover' as any)}
-          secondaryActionLabel="Reset Filters"
-          onSecondaryAction={() => {
-            // Need to reset filters and refresh
-            setFilters({ city: 'Mumbai', listingType: 'rent', bhk: null, furnishing: null, petFriendly: false });
-            fetchFeed(true);
-          }}
         />
       )}
 
