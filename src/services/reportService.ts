@@ -11,11 +11,12 @@ export const reportService = {
     if (!user) throw new Error('Authentication is required to report listings.');
 
     const { data, error } = await supabase
-      .from('listing_reports')
+      .from('property_reports')
       .insert([
         {
           property_id: propertyId,
           reporter_id: user.id,
+          category: reason,
           reason,
           details,
           status: 'pending'

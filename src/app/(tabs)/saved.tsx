@@ -58,23 +58,25 @@ export default function SavedScreen() {
   const createCollection = context?.createCollection || (() => Promise.resolve({} as any));
   const setFilters = context?.setFilters || (() => {});
 
+  const lastFetchTimeRef = React.useRef<number>(0);
+
   // Load all components data
-  const loadPersonalData = useCallback(async () => {
+  const loadPersonalData = useCallback(async (force = false) => {
     if (isGuest || !user) return;
+    const now = Date.now();
+    if (!force && now - lastFetchTimeRef.current < 60000) return;
+
     try {
-      // 1. Refresh collections
-      await fetchCollections();
+      lastFetchTimeRef.current = now;
+      const [, searches, alertSubs, history] = await Promise.all([
+        fetchCollections(),
+        savedSearchService.getSavedSearches(user.id),
+        alertService.getAlerts(user.id),
+        historyService.getRecentViews(user.id),
+      ]);
 
-      // 2. Fetch saved searches
-      const searches = await savedSearchService.getSavedSearches(user.id);
       setSavedSearches(searches);
-
-      // 3. Fetch alerts
-      const alertSubs = await alertService.getAlerts(user.id);
       setAlerts(alertSubs);
-
-      // 4. Fetch history
-      const history = await historyService.getRecentViews(user.id);
       setRecentViews(history);
     } catch {
       console.error('Failed to load personal metadata');

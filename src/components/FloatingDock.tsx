@@ -22,7 +22,7 @@ export interface FloatingDockProps {
   onTabPress: (key: string) => void;
 }
 
-export const FloatingDock: React.FC<FloatingDockProps> = ({
+const FloatingDockComponent: React.FC<FloatingDockProps> = React.memo(({
   tabs,
   activeTab,
   onTabPress,
@@ -114,7 +114,10 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
       )}
     </View>
   );
-};
+});
+
+FloatingDockComponent.displayName = 'FloatingDock';
+export const FloatingDock = FloatingDockComponent;
 
 const styles = StyleSheet.create({
   dockContainer: {

@@ -174,28 +174,48 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     loadPersistedConfig();
   }, []);
 
-  // Fetch bookmarks & collections automatically on user auth change
+  // Fetch bookmarks & collections automatically on user auth change once auth is ready
   useEffect(() => {
-    if (user && !isGuest) {
+    if (!authLoading && user && !isGuest) {
       const loadBookmarksAndCollections = async () => {
-        try {
+        const fetchSavedData = async () => {
           const bookmarked = await bookmarkService.getSavedProperties(user.id);
           setSavedProperties(bookmarked);
           setSavedPropertyIds(new Set(bookmarked.map((b) => b.id)));
 
           const cols = await collectionService.getCollections(user.id);
           setCollections(cols);
-        } catch (e) {
+        };
+
+        try {
+          await fetchSavedData();
+        } catch (e: any) {
+          const isJwtFutureErr =
+            e?.code === 'PGRST303' ||
+            (typeof e?.message === 'string' && e.message.includes('JWT issued at future')) ||
+            JSON.stringify(e).includes('PGRST303');
+
+          if (isJwtFutureErr) {
+            // Single 500ms delayed retry to absorb sub-second cloud container clock skew
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            try {
+              await fetchSavedData();
+              return;
+            } catch (retryErr) {
+              console.error('Error fetching live saved homes/collections after retry:', retryErr);
+              return;
+            }
+          }
           console.error('Error fetching live saved homes/collections:', e);
         }
       };
       loadBookmarksAndCollections();
-    } else {
+    } else if (!authLoading) {
       setSavedProperties([]);
       setSavedPropertyIds(new Set());
       setCollections([]);
     }
-  }, [user, isGuest]);
+  }, [user, isGuest, authLoading]);
 
   const fetchFeed = useCallback(async (isPullToRefresh = false) => {
     if (isPullToRefresh) {
