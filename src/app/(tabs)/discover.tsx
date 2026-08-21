@@ -11,6 +11,7 @@ import { SearchChip } from '../../features/discovery/components/SearchChip';
 import { useSearch } from '../../features/discovery/hooks/useSearch';
 import { useFilters } from '../../features/discovery/hooks/useFilters';
 import { useProperties } from '../../hooks/useProperties';
+import { useFeedback } from '../../context/FeedbackContext';
 import { SlidersHorizontal } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { historyService } from '../../services/historyService';
@@ -19,6 +20,7 @@ export default function DiscoverScreen() {
   const router = useRouter();
   const { filteredProperties } = useProperties();
   const { filters, updateFilters } = useFilters();
+  const { showToast } = useFeedback();
   const { query, performSearch, loadRecentSearches } = useSearch('test-user-id'); // use actual auth user ID here
   
   const [isMapView, setIsMapView] = useState(false);
@@ -97,9 +99,33 @@ export default function DiscoverScreen() {
 
         {!isMapView && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
-            <SearchChip label="Pet Friendly" onPress={() => updateFilters({ petFriendly: !filters.petFriendly })} isActive={filters.petFriendly} />
-            <SearchChip label="Verified Only" onPress={() => updateFilters({ trustFilters: ['verified'] })} isActive={filters.trustFilters?.includes('verified')} />
-            <SearchChip label="Walkthrough Video" onPress={() => updateFilters({ trustFilters: ['walkthrough'] })} isActive={filters.trustFilters?.includes('walkthrough')} />
+            <SearchChip
+              label="Pet Friendly"
+              onPress={() => {
+                const nextVal = !filters.petFriendly;
+                updateFilters({ petFriendly: nextVal });
+                showToast(nextVal ? 'Filter applied: Pet Friendly' : 'Filter removed: Pet Friendly');
+              }}
+              isActive={filters.petFriendly}
+            />
+            <SearchChip
+              label="Verified Only"
+              onPress={() => {
+                const isCurrent = filters.trustFilters?.includes('verified');
+                updateFilters({ trustFilters: isCurrent ? [] : ['verified'] });
+                showToast(!isCurrent ? 'Filter applied: Verified Only' : 'Filter removed: Verified Only');
+              }}
+              isActive={filters.trustFilters?.includes('verified')}
+            />
+            <SearchChip
+              label="Walkthrough Video"
+              onPress={() => {
+                const isCurrent = filters.trustFilters?.includes('walkthrough');
+                updateFilters({ trustFilters: isCurrent ? [] : ['walkthrough'] });
+                showToast(!isCurrent ? 'Filter applied: Walkthrough Video' : 'Filter removed: Walkthrough Video');
+              }}
+              isActive={filters.trustFilters?.includes('walkthrough')}
+            />
           </ScrollView>
         )}
       </View>

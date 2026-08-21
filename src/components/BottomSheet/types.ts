@@ -6,4 +6,6 @@ export interface BottomSheetProps {
   title?: string;
   children: ReactNode;
   snapPoints?: (string | number)[];
+  initialSnap?: 'open' | 'peek';
 }
+

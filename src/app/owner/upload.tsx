@@ -516,6 +516,10 @@ export default function OwnerUploadScreen() {
       showToast('At least one property image is required.', 'warning');
       return;
     }
+    if (!selectedVideo) {
+      showToast('A walkthrough video is required to publish this listing.', 'warning');
+      return;
+    }
 
     try {
       setShowPublishingStatus(true);
@@ -715,12 +719,14 @@ export default function OwnerUploadScreen() {
           <TouchableOpacity
             activeOpacity={Theme.motion.presets.press.scale}
             onPress={handlePickVideo}
-            style={[styles.mediaDropzone, { flex: 1.2 }]}
+            style={[styles.mediaDropzone, { flex: 1.2 }, !selectedVideo && { borderColor: Theme.colors.warning || '#D4A359' }]}
             disabled={publishing}
           >
-            <Video size={24} color={Theme.colors.primary} />
-            <Text style={styles.dropzoneTitle}>Video</Text>
-            <Text style={styles.dropzoneSub}>9:16 walkthrough</Text>
+            <Video size={24} color={selectedVideo ? Theme.colors.success : Theme.colors.primary} />
+            <Text style={styles.dropzoneTitle}>Video *</Text>
+            <Text style={[styles.dropzoneSub, !selectedVideo && { color: Theme.colors.warning || '#D4A359' }]}>
+              {selectedVideo ? 'Selected ✓' : '9:16 walkthrough *'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -1082,7 +1088,12 @@ export default function OwnerUploadScreen() {
           })}
         </View>
 
-        <Button variant="primary" style={styles.publishBtn} onPress={handlePublish} disabled={publishing}>
+        <Button
+          variant="primary"
+          style={styles.publishBtn}
+          onPress={handlePublish}
+          disabled={publishing || !selectedVideo}
+        >
           {id ? 'Save Changes' : 'Publish Listing'}
         </Button>
       </View>

@@ -225,10 +225,8 @@ export const UnifiedMediaCarousel: React.FC<UnifiedMediaCarouselProps> = React.m
 
   const handleScroll = React.useCallback((event: any) => {
     const index = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-    if (index !== currentSlideIndex) {
-      setCurrentSlideIndex(index);
-    }
-  }, [currentSlideIndex]);
+    setCurrentSlideIndex((prev) => (prev !== index ? index : prev));
+  }, []);
 
   const renderItem = React.useCallback(({ item: slide, index, extraData: activeSlideIndex }: any) => {
     if (slide.type === 'video') {

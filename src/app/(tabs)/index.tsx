@@ -13,7 +13,7 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useIsFocused } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../hooks/useAuth';
@@ -57,6 +57,7 @@ interface ResumeBrowsingState {
 
 export default function FeedScreen() {
   const router = useRouter();
+  const isFocused = useIsFocused();
   const { isGuest } = useAuth();
   const {
     properties,
@@ -394,8 +395,9 @@ export default function FeedScreen() {
   const handleViewCountIncrement = useCallback((id: string) => incrementViewCount(id), [incrementViewCount]);
 
   const renderItem = useCallback(({ item, index, extraData }: any) => {
-    const { activeIdx: currentActiveIdx, isMuted: currentIsMuted } = extraData || { activeIdx: 0, isMuted: false };
-    const isActive = index === currentActiveIdx;
+    const { activeIdx: currentActiveIdx, isMuted: currentIsMuted, isFocused: currentIsFocused } = extraData || { activeIdx: 0, isMuted: false, isFocused: true };
+    const isActive = Boolean(currentIsFocused) && index === currentActiveIdx;
+    const shouldLoad = Boolean(currentIsFocused) && (isActive || index === currentActiveIdx + 1);
 
     if ((item as any).isEndCard) {
       return (
@@ -424,7 +426,7 @@ export default function FeedScreen() {
         isActive={isActive}
         isSaved={isSaved}
         isMuted={currentIsMuted}
-        shouldLoad={isActive || index === currentActiveIdx + 1}
+        shouldLoad={shouldLoad}
         onToggleMute={handleToggleMute}
         onViewCountIncrement={() => handleViewCountIncrement(item.id)}
         onSavePress={handleSavePress}
@@ -453,6 +455,15 @@ export default function FeedScreen() {
     return data;
   }, [filteredProperties, loading, hasExactMatchesRemaining]);
 
+  const flashListExtraData = React.useMemo(
+    () => ({ activeIdx, isMuted, isFocused }),
+    [activeIdx, isMuted, isFocused]
+  );
+
+  const overrideItemLayout = React.useCallback((layout: { size?: number }) => {
+    layout.size = SCREEN_HEIGHT;
+  }, []);
+
   return (
     <ScreenContainer
       safeAreaTop={false}
@@ -465,7 +476,8 @@ export default function FeedScreen() {
         <FlashListAny
           ref={listRef}
           data={listData}
-          extraData={{ activeIdx, isMuted }}
+          extraData={flashListExtraData}
+          overrideItemLayout={overrideItemLayout}
           renderItem={renderItem}
           keyExtractor={(item: PropertyListing) => item.id}
           pagingEnabled

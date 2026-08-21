@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomSheet } from '../../../components/BottomSheet';
 import { Theme } from '../../../theme';
 import { Button } from '../../../components/Button';
@@ -83,6 +84,8 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
   filters,
   onApplyFilters,
 }) => {
+  const insets = useSafeAreaInsets();
+  const footerBottomPadding = Theme.floatingDock.height + Math.max(insets.bottom, Theme.spacing.md) + Theme.spacing.sm;
   const [selectedCity, setSelectedCity] = useState(filters.city || CITIES[0]);
   const [listingType, setListingType] = useState<'rent' | 'buy'>(filters.listingType || 'rent');
   const [sortBy, setSortBy] = useState<string>(filters.sortBy || 'newest');
@@ -162,7 +165,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
   };
 
   return (
-    <BottomSheet isOpen={isOpen} onClose={onClose} title="Advanced Filters">
+    <BottomSheet isOpen={isOpen} onClose={onClose} title="Advanced Filters" initialSnap="open">
       <View style={styles.innerContainer}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           
@@ -383,7 +386,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
 
         </ScrollView>
 
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: footerBottomPadding }]}>
           <TouchableOpacity onPress={handleResetAll} style={styles.resetBtn}>
             <Text style={styles.resetText}>Reset All</Text>
           </TouchableOpacity>

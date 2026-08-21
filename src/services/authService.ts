@@ -9,7 +9,7 @@ export const authService = {
         data: {
           full_name: fullName,
         },
-        emailRedirectTo: process.env.EXPO_PUBLIC_EMAIL_REDIRECT_URL,
+        emailRedirectTo: process.env.EXPO_PUBLIC_EMAIL_REDIRECT_URL || 'sixtyhouse://auth/callback',
       },
     });
 

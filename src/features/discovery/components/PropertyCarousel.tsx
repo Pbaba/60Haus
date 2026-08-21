@@ -16,7 +16,7 @@ interface PropertyCarouselProps {
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.75;
 
-export const PropertyCarousel: React.FC<PropertyCarouselProps> = ({ 
+const PropertyCarouselComponent: React.FC<PropertyCarouselProps> = React.memo(({ 
   title, 
   properties, 
   onViewAll,
@@ -68,7 +68,10 @@ export const PropertyCarousel: React.FC<PropertyCarouselProps> = ({
       </ScrollView>
     </View>
   );
-};
+});
+
+PropertyCarouselComponent.displayName = 'PropertyCarousel';
+export const PropertyCarousel = PropertyCarouselComponent;
 
 const styles = StyleSheet.create({
   container: {

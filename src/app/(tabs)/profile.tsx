@@ -28,9 +28,14 @@ export default function ProfileScreen() {
 
   const [recentViews, setRecentViews] = useState<PropertyListing[]>([]);
   const [recentLoading, setRecentLoading] = useState(false);
+  const lastProfileFetchRef = React.useRef<number>(0);
 
-  const fetchRecentHistory = useCallback(async () => {
+  const fetchRecentHistory = useCallback(async (force = false) => {
     if (isGuest || !profile?.id) return;
+    const now = Date.now();
+    if (!force && now - lastProfileFetchRef.current < 60000) return;
+
+    lastProfileFetchRef.current = now;
     setRecentLoading(true);
     try {
       const history = await historyService.getRecentViews(profile.id);
